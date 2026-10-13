@@ -1,3 +1,4 @@
+//sample data model for custom object entity
 @Metadata.layer: #CUSTOMER
 @UI.headerInfo: {
   typeName: 'Custom Object',
