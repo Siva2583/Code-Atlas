@@ -1,3 +1,9 @@
+Rules Specification - DRAFT
+
+Status: DRAFT. Field names follow docs/data-contract.md. All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
+
+The rules are deterministic: the same inputs and the same published rule-set version always give the same result. This is a rules engine, not AI or machine learning.
+
 1. The five outcomes
 KEEP_ADAPT
 REWRITE_RAP
@@ -38,7 +44,17 @@ Two or more active rules at the same best priority match with different outcomes
 The evidence contradicts itself, for example run_count = 0 but last_executed has a date, or run_count > 0 but last_executed is empty, or period_end is before period_start.
 5. Test cases on paper (10)
 
-"Window" means whole calendar months from period_start to period_end. The sample object ZSD_OPEN_ORDERS_RPT has exactly 12 (2025-10-13 to 2026-10-13). Seed rules used: R10 missing evidence, R20 retire, R30 high findings, R60 keep (all illustrative). "Findings: loaded" assumes open question 1 is solved.
+"Window" means whole calendar months from period_start to period_end. The sample object ZSD_OPEN_ORDERS_RPT has exactly 12 (2025-10-13 to 2026-10-13). "Findings: loaded" assumes open question 1 is solved.
+
+Seed rules used by the tests (illustrative, configurable). A lower priority number wins:
+
+Rule	Prio	Condition	Outcome
+R10	10	Any missing or incomplete evidence (section 3), or contradictory evidence (section 4)	MANUAL_REVIEW
+R20	20	run_count = 0, window of at least 12 whole months, not called by a HIGH-criticality object	RETIRE_CANDIDATE
+R30	30	Used (run_count > 0) and at least 1 HIGH finding	MANUAL_REVIEW
+R60	60	Used (run_count > 0) and no HIGH finding	KEEP_ADAPT
+
+Rules for REWRITE_RAP (prio 40) and SIDE_BY_SIDE_BTP (prio 50) are added once the data exists (section 6). If no rule matches, the result is MANUAL_REVIEW.
 
 #	Input facts	Expected outcome	Why
 T1	Run count 0, window exactly 12 months, criticality LOW, findings loaded (0), no caller	RETIRE_CANDIDATE	Boundary: 12 months is enough
