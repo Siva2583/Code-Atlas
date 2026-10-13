@@ -1,0 +1,3 @@
+source_system,from_type,from_name,to_type,to_name,dependency_type,evidence_source
+DEMO_SYS,PROG,ZSD_OPEN_ORDERS_RPT,CLAS,ZCL_PRICING_HELPER,CALL,DEMO
+DEMO_SYS,FUGR,ZSD_CUST_CREDIT_CHECK,CLAS,ZCL_INVOICE_UTIL,CALL,DEMO
