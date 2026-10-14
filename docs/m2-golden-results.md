@@ -27,6 +27,21 @@ Why each result (rule IDs from rules-spec section 5):
 
 Result counts: MANUAL_REVIEW 6, KEEP_ADAPT 1. Not reachable with this data: RETIRE_CANDIDATE, REWRITE_RAP, SIDE_BY_SIDE_BTP (see rules-spec section 6).
 
+## Portfolio Analytics Golden Summary (Day 6 — `M2-D06-T01`)
+
+Computed by `zccmc_cl_portfolio_analytics=>compute_summary` (and verified by `tools/m2_rules_oracle.py`) across the 7 synthetic sample objects:
+
+| Metric ID | Metric | Expected Value |
+|---|---|---|
+| `M-01` | Total objects evaluated in latest run (`total_objects`) | `7` |
+| `M-02` | Objects per `RecommendedStrategy` (`by_strategy`) | `MANUAL_REVIEW`: `6`, `KEEP_ADAPT`: `1`, `RETIRE_CANDIDATE`: `0`, `REWRITE_RAP`: `0`, `SIDE_BY_SIDE_BTP`: `0` |
+| `M-03` | Objects with complete vs. missing evidence | Complete: `3` (`ZSD_OPEN_ORDERS_RPT`, `ZCL_PRICING_HELPER`, `ZSD_CUST_CREDIT_CHECK`); Missing: `4` |
+| `M-03` Breakdown | Objects by `MissingEvidence` reason code (`by_missing_reason`) | `CRITICALITY_UNKNOWN`: `2`, `NO_USAGE_FACT`: `1`, `WINDOW_TOO_SHORT`: `1` |
+| Filter: `package_name = 'ZSD_PRICING'` | Filtered subset reconciliation | `total_objects`: `1` (`ZCL_PRICING_HELPER`), `KEEP_ADAPT`: `1`, `objects_with_missing_evidence`: `0` |
+| Filter: `criticality = 'HIGH'` | Filtered subset reconciliation | `total_objects`: `2` (`ZSD_OPEN_ORDERS_RPT`, `ZSD_CUST_CREDIT_CHECK`), `MANUAL_REVIEW`: `2`, `objects_with_missing_evidence`: `0` |
+| Empty portfolio (`[]`) | Zero-state behavior | `total_objects`: `0`, all 5 strategy counts `0`, `by_missing_reason` empty |
+| 1:N Join Deduplication | Repeat rows for same object key (`p_items * 5`) | Identical to unjoined 7-object summary (`total_objects` remains `7`, no double counting) |
+
 ## Run record (copied from the tool output)
 
 Command: `python tools/m2_rules_oracle.py --report out.md` from the repository root, 2026-10-14.
@@ -40,6 +55,7 @@ determinism: two clean runs identical = True
 permutation: 200 random row orders of all four files, differing = 0
 permutation: rule row order shuffled 20x for 25 scenarios, differing = 0
 perf fixtures: 1,000 and 10,000 objects evaluated (no usage loaded: all MANUAL_REVIEW, none silently lost)
+portfolio analytics: M-01=7, M-02 (MANUAL_REVIEW=6, KEEP_ADAPT=1), M-03=4, filters, empty & join-dedup checked
 
 RESULT: ALL CHECKS PASSED
 ```
