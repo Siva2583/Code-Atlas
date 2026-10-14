@@ -72,8 +72,8 @@ More detail, diagrams and page sketches: [`docs/architecture.md`](docs/architect
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   git clone https://github.com/Siva2583/Code-Atlas.git
+   cd code-atlas
    ```
 2. **Import the ABAP packages** into the target system: **TBC** (method and package names)
 3. **Activate** all objects and the OData service: **TBC**
