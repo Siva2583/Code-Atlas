@@ -1,68 +1,45 @@
-# Feasibility Note - DRAFT (Member 3, Day 1)
+# Day 1 SAP Capability Feasibility
 
-Status: DRAFT. Every result below is NOT TESTED until someone fills it in from a real run on the assigned SAP system.
-A capability is marked PASS only if it was observed working. Reading documentation does not count.
-All data used in probes is DEMO / SYNTHETIC.
+**Status: partial; not a tenant capability pass.** The user reports ADT access. No ADT session or SAP request was performed from this workspace, so capability cells below remain unverified.
 
-## 1. Environment
+## Tenant information currently available
 
-| Item | Value |
-|---|---|
-| System type (BTP ABAP environment trial / other) | TBC |
-| Release / version | TBC |
-| ABAP language version (ABAP Cloud?) | TBC |
-| Development tool used (VS Code ABAP extension / Eclipse ADT) | TBC |
-| Probe package | TBC |
-| Date of probes | TBC |
-| Tested by | Member 3 |
+- **Likely product:** SAP BTP ABAP Environment trial, inferred from the supplied service-binding metadata (sap.cloud.service and system ID).
+- **System ID / region:** TRL / AP21, as supplied by the user.
+- **ADT access:** reported available by the user; connection and package access have not been observed here.
+- **ABAP release, software component, package, transport:** unknown.
+- **Shared contract v0.2 approval:** unknown; do not treat the candidate as frozen.
 
-## 2. Capability matrix (Member 3)
+## Capability matrix
 
-Result values: PASS (observed working), FAIL (observed not working), BLOCKED (could not test, say why), NOT TESTED.
-
-| # | Capability | Probe | Result | Observed (exact output or error) | Objects / transport ID | Fallback if not PASS |
-|---|---|---|---|---|---|---|
-| 1 | CDS read service | CDS view entity on a table, exposed as a service, one read | NOT TESTED | | | |
-| 2 | Service binding and OData version | Binding published, metadata opens. Record V2 or V4 | NOT TESTED | | | |
-| 3 | RAP behavior: action | Managed BO with one action, called once | NOT TESTED | | | |
-| 4 | RAP behavior: validation | One validation that rejects bad input, called once | NOT TESTED | | | |
-| 5 | Current user lookup | Action returns or stores the logged-in user | NOT TESTED | | | |
-| 6 | Authorization: allowed path | A user with the role can run the action | NOT TESTED | | | |
-| 7 | Authorization: denied path | A user without the role gets a real error from the backend | NOT TESTED | | | |
-| 8 | Two test identities with different roles | At least two users that can be used for SoD tests | NOT TESTED | | | |
-| 9 | ETag / locking | Same record changed from two sessions, second save is rejected | NOT TESTED | | | |
-
-## 3. What each result means for the workflow design
-
-| If this is not PASS | Effect on docs/state-transitions.md |
-|---|---|
-| 5 (current user) | Separation of duties cannot be enforced. Record this as a blocker, do not claim SoD |
-| 7 or 8 (denied path, test users) | Role checks cannot be tested. Say role enforcement is unverified |
-| 9 (ETag / locking) | Stale-update protection is a documented limitation, not a feature |
-| 3 or 4 (action, validation) | Transition and override-reason rules cannot be enforced in the backend |
-
-## 4. Fiori Elements route (Member 4)
-
-| Item | Result | Evidence |
+| Capability | State | Evidence needed in ADT |
 |---|---|---|
-| Supported Fiori Elements preview / generation route | NOT TESTED | |
-| Screenshot or blocker | NOT TESTED | |
+| Log in to assigned tenant and identify release | NOT VERIFIED | System/project properties or supported system-information view; record exact product and release. |
+| Development package and transport | UNKNOWN | Record assigned package, software component and transport/request handling. |
+| Existing DDIC table activation | NOT RUN | Activate an approved minimal table object; record object and activation message. |
+| CDS view entity activation/read | NOT RUN | Activate a minimal approved view and read one synthetic row. |
+| ABAP class/interface activation | NOT RUN | Activate a minimal class/interface in the approved language version. |
+| ABAP Unit execution | UNKNOWN | Run a minimal local test class and record runner/result. |
+| Released UUID generation API | UNKNOWN | Check target release API state and package language version; do not guess an unreleased API. |
+| RAP behavior/service and OData version | UNKNOWN | Probe only if required by the signed architecture and package permissions. |
+| Current principal, roles and authorization checks | UNKNOWN | Record available identity/authorization APIs and approved test users. |
+| Lock/ETag or stale-update support | UNKNOWN | Record a successful permitted probe or a concrete limitation. |
+| CSV upload endpoint | UNKNOWN | No direct browser upload is assumed. Record exact supported flow if present. |
+| Staged-row CRUD fallback | UNKNOWN | Verify supported operations and tenant limits before designing a staging table. |
+| Fiori Elements preview/generation | UNKNOWN | Verify against a real service before adding UI assumptions. |
+| Request/file/row limits and approved synthetic loading | UNKNOWN | Record measured or documented limits and approved test route. |
 
-## 5. Import path (Member 3, used on Day 4)
+## Day 1 result
 
-| Item | Result | Evidence |
-|---|---|---|
-| Direct CSV upload through a RAP parameter | NOT TESTED | |
-| Staged-row CRUD plus a batch-processing action | NOT TESTED | |
-| If neither works: interactive import is BLOCKED, ABAP Unit ingestion only | | |
+The repository baseline and test inputs are documented, but Day 1 acceptance is **BLOCKED / NOT VERIFIED** until the tenant checks above are performed and recorded. Do not mark tables, CDS, importer, RAP, Fiori, roles, or performance as passed based on file names or service-binding metadata alone.
 
-## 6. Blockers
+## Evidence record to complete
 
-| # | Blocker | Impact | Owner | Next supported step |
-|---|---|---|---|---|
-| | | | | |
+For each probe, record date, exact release, package, artifact name, activation/test result, transport/request ID where applicable, and the smallest supported fallback when a capability fails. Never paste client secrets, access tokens, passwords or customer evidence into this note.
 
-## 7. Limitations
 
-- Results apply only to the system and release in section 1.
-- Nothing here claims production SSO, role mapping or a live SAP connection.
+## How to collect the missing release details
+
+In ADT, select the ABAP project in Project Explorer, then open **Window → Show View → Properties → System**. SAP documents that this view displays system details and installed software-component release/support-package information: https://help.sap.com/docs/abap-cloud/abap-development-tools-user-guide/displaying-system-connection-and-database-configuration
+
+Also record the development package containing the project's objects (from the package node in Project Explorer) and the assigned transport/request flow. Share only the product/release, package name, and probe results; never share client secrets, access tokens or passwords.

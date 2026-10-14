@@ -1,38 +1,45 @@
-# Runbook - DRAFT (Member 3 section, Day 1)
+# Member 1 Runbook — CSV Import and Verification
 
-Status: DRAFT. Steps marked TBC must be confirmed on the real system and release before anyone relies on them. All data is DEMO / SYNTHETIC.
+**Status:** repository-side instructions and candidate behavior only. No SAP activation, upload API or measured importer path is currently verified.
 
-## 1. Prerequisites
+## Before loading data
 
-- [ ] SAP BTP trial account with an ABAP environment instance that is running
-- [ ] VS Code with the SAP ABAP Development Tools extension, or Eclipse ADT as the fallback
-- [ ] Destination created and added to the workspace
-- [ ] A package where probe objects may be created, and a transport request if one is required: TBC
-- [ ] Two test users with different roles (for example one developer and one reviewer): TBC
+1. Confirm the assigned ABAP environment, release and package in ADT. Record the value and transport/request identifiers in docs/m1-baseline-checklist.md.
+2. Confirm in ADT that the signed contract's source-system, object, usage, finding, dependency, batch and row-result/error entities activate. Use the target's released UUID APIs and exact physical field lengths; do not silently truncate CSV fields.
+3. Confirm ABAP Unit, CDS reads, supported import entry path, request size and staged-row CRUD if considered. Record observed results. A web upload or service is not available by assumption.
+4. Obtain M2–M4 approval for docs/data-contract.md candidate v0.2. If findings_as_of or another schema decision changes, update the templates, fixtures and tests together before implementation.
+5. Provision the synthetic source system DEMO_SYS using the tenant-approved process.
 
-## 2. Connect (record the exact steps that worked)
+## Offline fixture check
 
-1. Create a destination (HTTP, system URL): TBC
-2. Add the destination as a workspace folder and sign in: TBC
-3. Confirm packages and objects appear in the Explorer: TBC
+From the repository root run:
 
-## 3. Probe steps (repeat in this order, record results in docs/feasibility-note.md)
+    python tools/validate_import_fixtures.py
 
-| Step | What to do | What to check | Done |
-|---|---|---|---|
-| 1 | Create a CDS view entity on a simple table, then a service definition and a service binding | A read returns data. OData version noted | [ ] |
-| 2 | Create a managed RAP business object with one action and one validation | Both activate and run once | [ ] |
-| 3 | Read the current user inside the action | The user ID is returned or stored. Method used: TBC (check SAP Help Portal for your release) | [ ] |
-| 4 | Add an authorization check to the action | Allowed user passes, denied user gets a backend error | [ ] |
-| 5 | Add ETag or lock handling and change the same record from two sessions | Second save is rejected with a conflict | [ ] |
-| 6 | Try the import path options in feasibility-note.md section 5 | Which one works, which one is blocked | [ ] |
+This checks template headers, CSV shape, base references, edge fixtures and 1k/10k fixture row counts. It reports local standard-library CSV read time only. It does not execute ABAP code or measure SAP import performance.
 
-For every step write down: the objects created, the transport ID, and the exact error text if anything failed.
+## Tenant import sequence
 
-## 4. Reset
+1. Start from a clean synthetic-only tenant/package. Never use customer evidence for these fixtures.
+2. Load objects.csv first, then usage.csv, findings.csv and dependencies.csv. Each file is a distinct import batch.
+3. Confirm each batch's parsed, accepted and rejected counts reconcile; inspect row-level errors and accepted-row provenance.
+4. Repeat the same files. Business rows should report UNCHANGED while each new attempt retains its own batch ID and row results.
+5. Run the edge fixtures one at a time and compare results with docs/import-design.md and docs/test-matrix.md.
+6. Run the 1,000-row and 10,000-row object fixtures through the same activated parser/loader. Record tenant/release, package, user, start/end time, input bytes/rows, accepted/rejected counts, repeat-import counts and elapsed time. Do not claim an SLA; no target has been approved.
+7. Reset only through the approved synthetic test cleanup procedure. Do not delete prior provenance as part of corrected-batch testing.
 
-How to remove or re-create the probe objects and test data: TBC
+## Current release record
 
-## 5. Known blockers
+- ABAP environment/release: awaiting tenant details.
+- Import route and request-size limit: unverified.
+- ADT package and transport: unverified.
+- Table/CDS activation and ABAP Unit result: not supplied.
+- SAP 1k/10k import timings: not measured.
+- Open blocker: source objects and all import classes/tests in the repository were empty at baseline.
 
-See docs/feasibility-note.md section 6.
+## Follow-up release record
+
+- Environment: likely SAP BTP ABAP Environment trial, inferred from user-supplied service-binding metadata; system TRL / AP21.
+- ADT access: user reports access; no ADT connection has been observed here.
+- Exact ABAP release, package, software component, UUID API, activation, ABAP Unit and import path: unknown or unverified. Fill these from docs/feasibility-note.md before activating implementation objects.
+- Candidate contract v0.2 remains pending shared approval; do not implement against it as a frozen contract until M2–M4 confirm the keys, enums, result/error codes, corrections and partial-file policy.

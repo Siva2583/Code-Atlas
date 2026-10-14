@@ -72,8 +72,8 @@ More detail, diagrams and page sketches: [`docs/architecture.md`](docs/architect
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   git clone https://github.com/Siva2583/Code-Atlas.git
+   cd code-atlas
    ```
 2. **Import the ABAP packages** into the target system: **TBC** (method and package names)
 3. **Activate** all objects and the OData service: **TBC**
@@ -111,9 +111,13 @@ More detail, diagrams and page sketches: [`docs/architecture.md`](docs/architect
 
 ## 6. Data Model and Import
 
-> **Owner: Member 1.** _Placeholder, to be completed._
+> Owner: Member 1 — ABAP Data & Import.
 
-Planned content: entities and keys, CSV templates, validation rules, idempotent import behavior, import batch statuses.
+The MVP imports exactly four synthetic-data CSV kinds: objects, usage, findings and dependencies. The object identity is the normalized source system, object type and object name; ObjectUUID is the technical key generated in SAP. Usage, findings and dependency rows reference that identity.
+
+The four exact template headers, candidate field types, upsert keys, date/enum rules, batch statuses, row errors, order and provenance requirements are maintained in docs/data-contract.md and docs/import-design.md. Candidate v0.2 adds findings_as_of to the objects file so a complete findings scan with zero findings can be distinguished from unknown coverage. That change is awaiting shared contract review.
+
+All repository sample data is synthetic. The sample and edge/performance fixtures are test inputs, not production observations. SAP table activation, the supported import route, ABAP Unit results and 1k/10k SAP timings remain unverified until recorded from the assigned ADT tenant.
 
 ---
 

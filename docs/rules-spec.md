@@ -1,6 +1,6 @@
-Rules Specification - DRAFT
+Rules Specification - DRAFT 
 
-Status: DRAFT. Field names follow docs/data-contract.md. All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
+Status: DRAFT. Members 1, 3 and 4 please review. Field names follow docs/data-contract.md (Member 1, v0.1; candidate v0.2 is not signed and is not yet the rules input contract). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
 
 The rules are deterministic: the same inputs and the same published rule-set version always give the same result. This is a rules engine, not AI or machine learning.
 
@@ -68,7 +68,7 @@ T8	No usage row for the object	MANUAL_REVIEW	No data is not zero usage
 T9	Two active rules at the same priority, different outcomes, both match	MANUAL_REVIEW	Rule conflict
 T10	run_count = 0 but last_executed = 2026-09-25	MANUAL_REVIEW	Contradictory evidence
 
-Also test determinism (run T1 to T10 twice, results must be identical) and that every result records the rule-set version used.
+Also test determinism (run T1 to T10 twice: the strategy, rationale and missing-evidence list must be identical, only the RecommendationRunID and run timestamp differ) and that every result records the rule-set version and a RecommendationRunID.
 
 6. Fields the rules need from the data contract
 Entity	Fields used	Used for
@@ -79,7 +79,7 @@ Dependency	from and to object, dependency_type	Find callers, derive "called by a
 
 Missing or unclear, to raise with Member 1:
 
-Findings loaded vs. none found. Objects with no findings rows cannot be told apart from objects whose findings were never loaded. We need a per-object indicator (for example a findings_as_of date) or an agreed row convention.
+Findings loaded vs. none found. Objects with no findings rows cannot be told apart from objects whose findings were never loaded. We need a per-object indicator (for example a findings_as_of date) or an agreed row convention. Member 1 candidate v0.2 proposes optional objects.findings_as_of for this purpose; it remains a GAP until M2–M4 approve the field and downstream rules are updated.
 evidence_as_of exists only on usage. Findings and dependencies have no as-of date, so freshness is checked on usage only.
 No data for REWRITE_RAP and SIDE_BY_SIDE_BTP. Nothing says an object is transactional, has high reuse or has an external integration. Either add optional columns or these two outcomes stay untestable.
 "Critical dependency" is derived, not stored (an object is critical if called by a HIGH-criticality object). Please confirm.
@@ -97,11 +97,57 @@ Criticality (HIGH | MEDIUM | LOW | UNKNOWN)
 The values are fine. UNKNOWN is treated as missing evidence and always leads to MANUAL_REVIEW.
 Please confirm that an empty CSV value is normalized to UNKNOWN, not rejected or defaulted to LOW.
 Please state who provides the value (business owner) and that it is a given business attribute, not computed by the engine.
+business_owner is free text, not a user ID. The rules do not use it, and it must not be used for separation of duties. Member 3 keeps a separate OwnerUser field on the decision for that.
 
 Both enums should be normalized to upper case on import, like object_type.
 
-8. Limitations
+8. Rules output (handover to Member 3)
+
+Each evaluation returns one result per object with these fields (proposed, to be confirmed with Member 3):
+
+Field	Meaning
+ObjectUUID	The object that was evaluated (key of CustomObject)
+RecommendationRunID	Identifies the engine run that produced this result. A new value for every run, never reused and never changed. A result is identified by RecommendationRunID + ObjectUUID
+RecommendedStrategy	One of the five outcomes in section 1
+RuleSetVersion	The published rule-set version used (with the rule-set ID)
+Explanation	Text built from the matched rule's rationale and the real evidence values
+MissingEvidence	The list of reasons from sections 3 and 4, empty if none
+MatchedRuleIDs	The rules that matched, in priority order
+RunTimestamp	UTC, server time
+
+Run and rerun rules:
+
+Every run, including a rerun, gets a new RecommendationRunID. Old runs are kept, so any past result can be reproduced from its rule-set version and evidence.
+The engine never changes a decision. If an object already has an active decision, the new result is stored as a new recommendation revision and the decision is flagged for re-review. Member 3 owns the decision, its status and its final strategy.
+From the rules side there is no objection to Member 3's proposal of at most one active decision per ObjectUUID. A rerun updates the recommendation of the existing decision instead of creating a second one.
+
+Open point: the data type of RecommendationRunID (to match the UUID type Member 1 uses once the tables exist).
+
+9. Limitations
 Deterministic rules only. No ML and no claim of predictive accuracy.
 Sample data is synthetic and labeled DEMO / SYNTHETIC.
 Thresholds and weights are illustrative until validated by a migration expert.
 Evidence comes from CSV import only. Live adapters are future work.
+
+10. Rule-to-field map 
+
+| Rule / condition | Source entity.field | Available in contract? |
+|---|---|---|
+| R10: no usage row | UsageFact row exists for ObjectUUID | Yes |
+| R10: window shorter than 12 whole months | UsageFact.period_start, period_end | Yes |
+| R10: criticality UNKNOWN | CustomObject.criticality | Yes (empty CSV value must normalize to UNKNOWN, to confirm) |
+| R10: evidence older than 30 days | UsageFact.evidence_as_of vs evaluation date | Yes, usage only. Needs an evaluation_date input |
+| R10: findings not known to be loaded | none | GAP: no per-object findings indicator |
+| R10/section 4: run_count = 0 but last_executed set | UsageFact.run_count, last_executed | Yes |
+| R10/section 4: run_count > 0 but last_executed empty | UsageFact.run_count, last_executed | Yes |
+| R10/section 4: period_end before period_start | UsageFact.period_start, period_end | Yes |
+| R20: run_count = 0 | UsageFact.run_count | Yes |
+| R20: not called by a HIGH-criticality object | Dependency (To = this object) joined to caller's CustomObject.criticality | Yes, derived (to confirm) |
+| R30/R60: used (run_count > 0) | UsageFact.run_count | Yes |
+| R30/R60: count of HIGH findings | Finding.severity | Yes (INFO ignored) |
+| Tie at same priority (section 4) | rule table: priority, outcome, active flag | Rule config, not CSV data |
+| REWRITE_RAP (prio 40) | transactional / reuse | GAP: no field |
+| SIDE_BY_SIDE_BTP (prio 50) | external integration / released-API boundary | GAP: no field |
+
+Engine inputs that are not CSV fields: evaluation_date (so freshness is
+deterministic in tests), rule-set version, RecommendationRunID
