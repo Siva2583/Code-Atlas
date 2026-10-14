@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/Analytics.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.Analytics.v1" Alias="Analytics"/>
+  </edmx:Reference>
+
+  <edmx:DataServices>
+    <Schema Namespace="ZCCMC_C_PORTFOLIO" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      
+      <EntityType Name="PortfolioItem">
+        <Key>
+          <PropertyRef Name="ObjectUUID"/>
+        </Key>
+        <Property Name="ObjectUUID" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="ObjectName" Type="Edm.String" Nullable="false" MaxLength="120"/>
+        <Property Name="ObjectType" Type="Edm.String" Nullable="false" MaxLength="10"/>
+        <Property Name="PackageName" Type="Edm.String" MaxLength="120"/>
+        <Property Name="RecommendedStrategy" Type="Edm.String" MaxLength="40"/>
+        <Property Name="RiskCategory" Type="Edm.String" MaxLength="20"/>
+        <Property Name="DecisionStatus" Type="Edm.String" MaxLength="30"/>
+        <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
+        <Property Name="TotalCount" Type="Edm.Int32"/>
+      </EntityType>
+
+      <EntityContainer Name="Service">
+        <EntitySet Name="PortfolioItems" EntityType="ZCCMC_C_PORTFOLIO.PortfolioItem"/>
+      </EntityContainer>
+
+      <Annotations Target="ZCCMC_C_PORTFOLIO.PortfolioItem">
+        
+        <!-- Top Filters -->
+        <Annotation Term="UI.SelectionFields">
+          <Collection>
+            <PropertyPath>RecommendedStrategy</PropertyPath>
+            <PropertyPath>RiskCategory</PropertyPath>
+            <PropertyPath>DecisionStatus</PropertyPath>
+            <PropertyPath>ObjectType</PropertyPath>
+            <PropertyPath>PackageName</PropertyPath>
+          </Collection>
+        </Annotation>
+
+        <!-- KPI Tag / Header Metric -->
+        <Annotation Term="UI.HeaderInfo">
+          <Record Type="UI.HeaderInfo">
+            <PropertyValue Property="TypeName" String="Object"/>
+            <PropertyValue Property="TypeNamePlural" String="Portfolio Overview"/>
+          </Record>
+        </Annotation>
+
+        <!-- Chart 1: Proposed Strategy Distribution (Donut) -->
+        <Annotation Term="UI.Chart" Qualifier="StrategyDistribution">
+          <Record Type="UI.ChartDefinitionType">
+            <PropertyValue Property="Title" String="Objects by Strategy"/>
+            <PropertyValue Property="ChartType" EnumMember="UI.ChartType/Donut"/>
+            <PropertyValue Property="Dimensions">
+              <Collection>
+                <PropertyPath>RecommendedStrategy</PropertyPath>
+              </Collection>
+            </PropertyValue>
+            <PropertyValue Property="Measures">
+              <Collection>
+                <PropertyPath>TotalCount</PropertyPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+
+        <!-- Chart 2: Risk Profile Distribution (Bar/Column) -->
+        <Annotation Term="UI.Chart" Qualifier="RiskDistribution">
+          <Record Type="UI.ChartDefinitionType">
+            <PropertyValue Property="Title" String="Risk Profile"/>
+            <PropertyValue Property="ChartType" EnumMember="UI.ChartType/Column"/>
+            <PropertyValue Property="Dimensions">
+              <Collection>
+                <PropertyPath>RiskCategory</PropertyPath>
+              </Collection>
+            </PropertyValue>
+            <PropertyValue Property="Measures">
+              <Collection>
+                <PropertyPath>TotalCount</PropertyPath>
+              </Collection>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+
+        <!-- Detail Table Underneath Charts -->
+        <Annotation Term="UI.LineItem">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="ObjectName"/>
+              <PropertyValue Property="Label" String="Object Name"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="ObjectType"/>
+              <PropertyValue Property="Label" String="Type"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="PackageName"/>
+              <PropertyValue Property="Label" String="Package"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+              <PropertyValue Property="Label" String="Strategy"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="RiskCategory"/>
+              <PropertyValue Property="Label" String="Risk Level"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="DecisionStatus"/>
+              <PropertyValue Property="Label" String="Decision Status"/>
+            </Record>
+          </Collection>
+        </Annotation>
+
+      </Annotations>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>

@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+    <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+        <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+    </edmx:Reference>
+    <edmx:DataServices>
+        <Schema Namespace="ZCCMC_C_CUSTOMOBJECT" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+            <EntityType Name="CustomObject">
+                <Key>
+                    <PropertyRef Name="ObjectUUID"/>
+                </Key>
+                <Property Name="ObjectUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="SourceSystemID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="ObjectName" Type="Edm.String" Nullable="false" MaxLength="120"/>
+                <Property Name="ObjectType" Type="Edm.String" Nullable="false" MaxLength="10"/>
+                <Property Name="PackageName" Type="Edm.String" MaxLength="120"/>
+                <Property Name="Description" Type="Edm.String" MaxLength="500"/>
+                <Property Name="BusinessOwner" Type="Edm.String" MaxLength="120"/>
+                <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
+                <Property Name="FirstSeen" Type="Edm.Date"/>
+                <Property Name="LastSeen" Type="Edm.Date"/>
+                <Property Name="RiskScore" Type="Edm.Int32"/>
+                <Property Name="RiskCriticality" Type="Edm.Int32"/>
+                <Property Name="RecommendedStrategy" Type="Edm.String" MaxLength="40"/>
+                <Property Name="DecisionStatus" Type="Edm.String" MaxLength="30"/>
+                <Property Name="EvidenceAsOf" Type="Edm.Date"/>
+                <NavigationProperty Name="_Findings" Type="Collection(ZCCMC_C_CUSTOMOBJECT.Finding)" Partner="_CustomObject"/>
+                <NavigationProperty Name="_AuditTrail" Type="Collection(ZCCMC_C_CUSTOMOBJECT.AuditEvent)" Partner="_CustomObject"/>
+            </EntityType>
+            <EntityType Name="Finding">
+                <Key>
+                    <PropertyRef Name="FindingUUID"/>
+                </Key>
+                <Property Name="FindingUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="ObjectUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="FindingID" Type="Edm.String" MaxLength="80"/>
+                <Property Name="CheckID" Type="Edm.String" MaxLength="80"/>
+                <Property Name="Category" Type="Edm.String" MaxLength="40"/>
+                <Property Name="Severity" Type="Edm.String" MaxLength="10"/>
+                <Property Name="Message" Type="Edm.String" MaxLength="500"/>
+                <Property Name="SourceReference" Type="Edm.String" MaxLength="120"/>
+                <NavigationProperty Name="_CustomObject" Type="ZCCMC_C_CUSTOMOBJECT.CustomObject" Nullable="false" Partner="_Findings">
+                    <ReferentialConstraint Property="ObjectUUID" ReferencedProperty="ObjectUUID"/>
+                </NavigationProperty>
+            </EntityType>
+            <EntityType Name="AuditEvent">
+                <Key>
+                    <PropertyRef Name="AuditUUID"/>
+                </Key>
+                <Property Name="AuditUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="ObjectUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="Actor" Type="Edm.String" MaxLength="120"/>
+                <Property Name="Timestamp" Type="Edm.DateTimeOffset"/>
+                <Property Name="OldValue" Type="Edm.String" MaxLength="500"/>
+                <Property Name="NewValue" Type="Edm.String" MaxLength="500"/>
+                <Property Name="Reason" Type="Edm.String" MaxLength="500"/>
+                <NavigationProperty Name="_CustomObject" Type="ZCCMC_C_CUSTOMOBJECT.CustomObject" Nullable="false" Partner="_AuditTrail">
+                    <ReferentialConstraint Property="ObjectUUID" ReferencedProperty="ObjectUUID"/>
+                </NavigationProperty>
+            </EntityType>
+            <Action Name="approveDecision" IsBound="true">
+                <Parameter Name="bindingParameter" Type="ZCCMC_C_CUSTOMOBJECT.CustomObject" Nullable="false"/>
+            </Action>
+            <Action Name="overrideDecision" IsBound="true">
+                <Parameter Name="bindingParameter" Type="ZCCMC_C_CUSTOMOBJECT.CustomObject" Nullable="false"/>
+                <Parameter Name="Reason" Type="Edm.String" Nullable="false" MaxLength="500"/>
+            </Action>
+            <EntityContainer Name="Service">
+                <EntitySet Name="CustomObjects" EntityType="ZCCMC_C_CUSTOMOBJECT.CustomObject">
+                    <NavigationPropertyBinding Path="_Findings" Target="Findings"/>
+                    <NavigationPropertyBinding Path="_AuditTrail" Target="AuditTrail"/>
+                </EntitySet>
+                <EntitySet Name="Findings" EntityType="ZCCMC_C_CUSTOMOBJECT.Finding">
+                    <NavigationPropertyBinding Path="_CustomObject" Target="CustomObjects"/>
+                </EntitySet>
+                <EntitySet Name="AuditTrail" EntityType="ZCCMC_C_CUSTOMOBJECT.AuditEvent">
+                    <NavigationPropertyBinding Path="_CustomObject" Target="CustomObjects"/>
+                </EntitySet>
+            </EntityContainer>
+            <Annotations Target="ZCCMC_C_CUSTOMOBJECT.CustomObject">
+                <Annotation Term="UI.HeaderInfo">
+                    <Record Type="UI.HeaderInfo">
+                        <PropertyValue Property="TypeName" String="Custom Object"/>
+                        <PropertyValue Property="TypeNamePlural" String="Custom Objects"/>
+                        <PropertyValue Property="Title">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectName"/>
+                            </Record>
+                        </PropertyValue>
+                        <PropertyValue Property="Description">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectType"/>
+                            </Record>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <Annotation Term="UI.SelectionFields">
+                    <Collection>
+                        <PropertyPath>ObjectName</PropertyPath>
+                        <PropertyPath>ObjectType</PropertyPath>
+                        <PropertyPath>PackageName</PropertyPath>
+                        <PropertyPath>RiskScore</PropertyPath>
+                        <PropertyPath>DecisionStatus</PropertyPath>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Identification">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="SourceSystemID"/>
+                            <PropertyValue Property="Label" String="Source System"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Criticality"/>
+                            <PropertyValue Property="Label" String="Criticality"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="BusinessOwner"/>
+                            <PropertyValue Property="Label" String="Business Owner"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="EvidenceAsOf"/>
+                            <PropertyValue Property="Label" String="Evidence As Of"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectName"/>
+                            <PropertyValue Property="Label" String="Object Name"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectType"/>
+                            <PropertyValue Property="Label" String="Object Type"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="PackageName"/>
+                            <PropertyValue Property="Label" String="Package"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RiskScore"/>
+                            <PropertyValue Property="Label" String="Risk Score"/>
+                            <PropertyValue Property="Criticality" Path="RiskCriticality"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+                            <PropertyValue Property="Label" String="Recommended Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="DecisionStatus"/>
+                            <PropertyValue Property="Label" String="Status"/>
+                        </Record>
+                        <Record Type="UI.DataFieldForAction">
+                            <PropertyValue Property="Action" String="ZCCMC_C_CUSTOMOBJECT.approveDecision"/>
+                            <PropertyValue Property="Label" String="Approve"/>
+                        </Record>
+                        <Record Type="UI.DataFieldForAction">
+                            <PropertyValue Property="Action" String="ZCCMC_C_CUSTOMOBJECT.overrideDecision"/>
+                            <PropertyValue Property="Label" String="Override"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Facets">
+                    <Collection>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="ObjectHeader"/>
+                            <PropertyValue Property="Purpose" EnumMember="UI.FacetPurpose/Header"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.DataPoint#RiskScore"/>
+                        </Record>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="ObjectHeaderStatus"/>
+                            <PropertyValue Property="Purpose" EnumMember="UI.FacetPurpose/Header"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.DataPoint#DecisionStatus"/>
+                        </Record>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="GeneralInfo"/>
+                            <PropertyValue Property="Label" String="Object Summary"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.Identification"/>
+                        </Record>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="FindingsTab"/>
+                            <PropertyValue Property="Label" String="Findings"/>
+                            <PropertyValue Property="Target" AnnotationPath="_Findings/@UI.LineItem"/>
+                        </Record>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="AuditTab"/>
+                            <PropertyValue Property="Label" String="Audit Timeline"/>
+                            <PropertyValue Property="Target" AnnotationPath="_AuditTrail/@UI.LineItem"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.DataPoint" Qualifier="RiskScore">
+                    <Record Type="UI.DataPointType">
+                        <PropertyValue Property="Value" Path="RiskScore"/>
+                        <PropertyValue Property="Title" String="Risk Score"/>
+                    </Record>
+                </Annotation>
+                <Annotation Term="UI.DataPoint" Qualifier="DecisionStatus">
+                    <Record Type="UI.DataPointType">
+                        <PropertyValue Property="Value" Path="DecisionStatus"/>
+                        <PropertyValue Property="Title" String="Status"/>
+                    </Record>
+                </Annotation>
+            </Annotations>
+            <Annotations Target="ZCCMC_C_CUSTOMOBJECT.Finding">
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="FindingID"/>
+                            <PropertyValue Property="Label" String="Finding"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="CheckID"/>
+                            <PropertyValue Property="Label" String="Check"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Severity"/>
+                            <PropertyValue Property="Label" String="Severity"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Message"/>
+                            <PropertyValue Property="Label" String="Message"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+            </Annotations>
+            <Annotations Target="ZCCMC_C_CUSTOMOBJECT.AuditEvent">
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Timestamp"/>
+                            <PropertyValue Property="Label" String="Timestamp"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Actor"/>
+                            <PropertyValue Property="Label" String="Actor"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="OldValue"/>
+                            <PropertyValue Property="Label" String="Previous Value"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="NewValue"/>
+                            <PropertyValue Property="Label" String="New Value"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Reason"/>
+                            <PropertyValue Property="Label" String="Reason"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+            </Annotations>
+        </Schema>
+    </edmx:DataServices>
+</edmx:Edmx>
