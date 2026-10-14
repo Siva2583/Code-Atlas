@@ -13,6 +13,7 @@
 6. [Data Model and Import](#6-data-model-and-import)
 7. [Rules Engine and Analytics](#7-rules-engine-and-analytics)
 8. [Review Workflow and Security](#8-review-workflow-and-security)
+9. [Fiori UX and QA/Integration](#9-fiori-ux-and-qaintegration)
 
 ---
 
@@ -105,7 +106,7 @@ More detail, diagrams and page sketches: [`docs/architecture.md`](docs/architect
 | 1 | ABAP Data & Import         | Tables and CDS, CSV staging and validation, idempotent loaders | [Section 6](#6-data-model-and-import)|
 | 2 | Rules & Analytics          | Rules evaluator, rule versioning, risk score, what-if | [Section 7](#7-rules-engine-and-analytics)|
 | 3 | RAP Workflow & Security    | Decision business object, actions, authorization, audit | [Section 8](#8-review-workflow-and-security)|
-| 4 | Fiori UX & QA/Integration | Fiori pages, README, architecture and demo docs, integration | Sections 1 to 5 |
+| 4 | Fiori UX & QA/Integration | Fiori UX prototypes, README, architecture and demo docs, integration planning | Sections 1 to 5 and 9 |
 
 ---
 
@@ -123,7 +124,7 @@ All repository sample data is synthetic. The sample and edge/performance fixture
 
 ## 7. Rules Engine and Analytics
 
-> **Owner: Member 2.** _Placeholder, to be completed._
+> **Owner: Member 2.** _Rules Engine and Analytics_
 
 Planned content: rule outcomes, evaluation order, rule-set versioning, risk score formula, what-if simulation, test summary.
 
@@ -131,6 +132,34 @@ Planned content: rule outcomes, evaluation order, rule-set versioning, risk scor
 
 ## 8. Review Workflow and Security
 
-> **Owner: Member 3.** _Placeholder, to be completed._
+> **Owner: Member 3 — RAP Workflow & Security.**
 
-Planned content: decision state machine, actions, roles and authorization, separation of duties, audit event fields, test matrix.
+The Migration Decision workflow is responsible for routing custom-code modernization recommendations through human review and recording the resulting decisions.
+
+The proposed workflow covers:
+
+* **Decision lifecycle:** `PROPOSED`, `IN_REVIEW`, `APPROVED`, `OVERRIDDEN`, `RETURNED`, `IN_PROGRESS`, `BLOCKED`, and `MIGRATED`.
+* **Role-based permissions:** Developer, Reviewer, Admin, and proposed read-only Auditor permissions.
+* **Separation of duties:** the backend must prevent users from approving or overriding decisions they prepared or own when separation of duties is enabled.
+* **Audit history:** successful workflow changes should record the authenticated actor, timestamp, previous and new values, and applicable reason.
+* **Concurrency:** stale updates must not silently overwrite a newer decision.
+
+The workflow contract, allowed transitions, validation requirements, audit fields, and required negative tests are documented in [`docs/state-transitions.md`](docs/state-transitions.md).
+
+**Implementation status:** The workflow remains a proposed design pending team agreement. RAP business-object activation, backend authorization, audit persistence, stale-update protection, and project service exposure have not yet been verified in the assigned SAP environment. See [`docs/feasibility-note.md`](docs/feasibility-note.md) and [`docs/limitations.md`](docs/limitations.md) for current verification status.
+
+---
+
+## 9. Fiori UX and QA/Integration
+
+> **Owner: Member 4 — Fiori UX & QA/Integration.**
+
+The current UI work is a prototype built with SAP Fiori elements and synthetic local data:
+
+* **Portfolio overview:** `src/zccmc_ui/portfolio-overview/` contains a Fiori elements OData V4 List Report prototype for portfolio items, with filter and chart annotations and a local mock-data setup.
+* **Custom-object experience:** `src/zccmc_ui/fiori-app/` contains a Fiori app scaffold for the custom-object list and detail experience. Its routes and mock preview are for local validation; they are not a published SAP service.
+* **Design and demo references:** [`docs/architecture.md`](docs/architecture.md) describes the five planned UI pages, and [`docs/demo-script.md`](docs/demo-script.md) outlines the intended synthetic-data walkthrough.
+
+**Current limitations:** These prototypes use local metadata/mock data and placeholder service URLs. They are not connected to an activated RAP business object or a live OData service. The portfolio overview and the decision-workflow proposal also use status vocabularies that still require alignment before the UI contract is finalized. Import Center, Rules Administration, and end-to-end backend integration remain planned work; no production-readiness or SAP-system integration is claimed.
+
+**QA focus:** Validate that the Fiori app launches with its local mock service, that list filters/navigation and displayed annotations match the agreed data and workflow contracts, and that documented demo flows use synthetic data. Record browser/build/test results when those checks are run; a successful local preview does not prove backend authorization, RAP behavior, or service activation.
