@@ -1,6 +1,6 @@
-Rules Specification - DRAFT
+Rules Specification - DRAFT 
 
-Status: DRAFT. Field names follow docs/data-contract.md. All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
+Status: DRAFT. Members 1, 3 and 4 please review. Field names follow docs/data-contract.md (Member 1, v0.1). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
 
 The rules are deterministic: the same inputs and the same published rule-set version always give the same result. This is a rules engine, not AI or machine learning.
 
@@ -68,7 +68,7 @@ T8	No usage row for the object	MANUAL_REVIEW	No data is not zero usage
 T9	Two active rules at the same priority, different outcomes, both match	MANUAL_REVIEW	Rule conflict
 T10	run_count = 0 but last_executed = 2026-09-25	MANUAL_REVIEW	Contradictory evidence
 
-Also test determinism (run T1 to T10 twice, results must be identical) and that every result records the rule-set version used.
+Also test determinism (run T1 to T10 twice: the strategy, rationale and missing-evidence list must be identical, only the RecommendationRunID and run timestamp differ) and that every result records the rule-set version and a RecommendationRunID.
 
 6. Fields the rules need from the data contract
 Entity	Fields used	Used for
@@ -97,10 +97,33 @@ Criticality (HIGH | MEDIUM | LOW | UNKNOWN)
 The values are fine. UNKNOWN is treated as missing evidence and always leads to MANUAL_REVIEW.
 Please confirm that an empty CSV value is normalized to UNKNOWN, not rejected or defaulted to LOW.
 Please state who provides the value (business owner) and that it is a given business attribute, not computed by the engine.
+business_owner is free text, not a user ID. The rules do not use it, and it must not be used for separation of duties. Member 3 keeps a separate OwnerUser field on the decision for that.
 
 Both enums should be normalized to upper case on import, like object_type.
 
-8. Limitations
+8. Rules output (handover to Member 3)
+
+Each evaluation returns one result per object with these fields (proposed, to be confirmed with Member 3):
+
+Field	Meaning
+ObjectUUID	The object that was evaluated (key of CustomObject)
+RecommendationRunID	Identifies the engine run that produced this result. A new value for every run, never reused and never changed. A result is identified by RecommendationRunID + ObjectUUID
+RecommendedStrategy	One of the five outcomes in section 1
+RuleSetVersion	The published rule-set version used (with the rule-set ID)
+Explanation	Text built from the matched rule's rationale and the real evidence values
+MissingEvidence	The list of reasons from sections 3 and 4, empty if none
+MatchedRuleIDs	The rules that matched, in priority order
+RunTimestamp	UTC, server time
+
+Run and rerun rules:
+
+Every run, including a rerun, gets a new RecommendationRunID. Old runs are kept, so any past result can be reproduced from its rule-set version and evidence.
+The engine never changes a decision. If an object already has an active decision, the new result is stored as a new recommendation revision and the decision is flagged for re-review. Member 3 owns the decision, its status and its final strategy.
+From the rules side there is no objection to Member 3's proposal of at most one active decision per ObjectUUID. A rerun updates the recommendation of the existing decision instead of creating a second one.
+
+Open point: the data type of RecommendationRunID (to match the UUID type Member 1 uses once the tables exist).
+
+9. Limitations
 Deterministic rules only. No ML and no claim of predictive accuracy.
 Sample data is synthetic and labeled DEMO / SYNTHETIC.
 Thresholds and weights are illustrative until validated by a migration expert.
