@@ -36,3 +36,10 @@ This checks template headers, CSV shape, base references, edge fixtures and 1k/1
 - Table/CDS activation and ABAP Unit result: not supplied.
 - SAP 1k/10k import timings: not measured.
 - Open blocker: source objects and all import classes/tests in the repository were empty at baseline.
+
+## Follow-up release record
+
+- Environment: likely SAP BTP ABAP Environment trial, inferred from user-supplied service-binding metadata; system TRL / AP21.
+- ADT access: user reports access; no ADT connection has been observed here.
+- Exact ABAP release, package, software component, UUID API, activation, ABAP Unit and import path: unknown or unverified. Fill these from docs/feasibility-note.md before activating implementation objects.
+- Candidate contract v0.2 remains pending shared approval; do not implement against it as a frozen contract until M2–M4 confirm the keys, enums, result/error codes, corrections and partial-file policy.

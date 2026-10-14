@@ -41,3 +41,7 @@ Candidate v0.2 adds findings_as_of to the objects template so a complete finding
 ## Day 1 acceptance
 
 Repository inventory and exact original headers are recorded. Activation, persistence read/write and supported import path remain open gates; fill them with observed ADT results before marking the checklist fully passed.
+
+## Follow-up environment information (2026-10-14)
+
+The user reports having ADT access. The supplied service-binding metadata suggests an SAP BTP ABAP Environment trial (system ID TRL, region AP21); this has not been independently connected or verified in ADT. The exact ABAP release, development package, software component, UUID API availability, activation results, ABAP Unit support, transport IDs and import route remain unknown. See docs/feasibility-note.md for the capability checklist. No credentials are recorded here.

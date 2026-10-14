@@ -20,3 +20,10 @@ The repository work below is a reviewable proposal. This status distinguishes co
 ## Current gate
 
 The repository evidence and candidate fixtures are ready for review. To finish the SAP-dependent acceptance criteria, the remaining inputs are the ADT release/package/capability results and sign-off on candidate v0.2. The separate project ZIP referenced in the request was not present in this branch tree; its path or attachment is still needed if it contains requirements not represented by this repository.
+
+## Follow-up inputs received (2026-10-14)
+
+- The supplied ZIP is the Clean Core Migration Cockpit skill and conceptual reference package. It guides the scope and invariants; it contains no project source files or additional signed contract.
+- The user reports ADT access and supplied an SAP service binding whose metadata suggests an SAP BTP ABAP Environment trial, system ID TRL, region AP21. This is metadata-based identification, not a live ADT connection or release check.
+- Exact ABAP release, package, activated objects, transport IDs, ABAP Unit capability and supported import route remain unknown. The user cannot yet confirm M2–M4 approval of candidate contract v0.2.
+- Candidate v0.2 remains unfrozen. Day 3–8 SAP implementation and acceptance are still gated on the Day 1 tenant checks and shared contract approval; no secret material is stored in the repository.
