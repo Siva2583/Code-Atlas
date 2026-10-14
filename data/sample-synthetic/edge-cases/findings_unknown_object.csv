@@ -1,0 +1,2 @@
+source_system,object_type,object_name,finding_id,check_id,category,severity,message,source_reference
+DEMO_SYS,PROG,ZUNKNOWN_IMPORT_TARGET,F900,DEMO_CHK_UNKNOWN,API,LOW,DEMO finding references an unknown object,DEMO_EDGE_UNKNOWN

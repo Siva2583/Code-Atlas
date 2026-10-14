@@ -1,0 +1,2 @@
+source_system,object_type,object_name,finding_id,check_id,category,severity,message,source_reference
+DEMO_SYS,PROG,ZSD_OPEN_ORDERS_RPT,F900,DEMO_CHK_QUOTED,API,LOW,"DEMO quoted, comma and ""quote"" fixture",DEMO_EDGE_QUOTED
