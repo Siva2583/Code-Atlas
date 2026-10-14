@@ -1,45 +1,119 @@
-# Day 1 SAP Capability Feasibility
+# RAP Workflow and Security Feasibility Note
 
-**Status: partial; not a tenant capability pass.** The user reports ADT access. No ADT session or SAP request was performed from this workspace, so capability cells below remain unverified.
+**Owner:** Member 3 — RAP Workflow & Security
+**Version:** 0.1
+**Status:** IN PROGRESS — capabilities require tenant evidence
+**Branch:** `feature/m3-rap-workflow`
 
-## Tenant information currently available
+## 1. Purpose
 
-- **Likely product:** SAP BTP ABAP Environment trial, inferred from the supplied service-binding metadata (sap.cloud.service and system ID).
-- **System ID / region:** TRL / AP21, as supplied by the user.
-- **ADT access:** reported available by the user; connection and package access have not been observed here.
-- **ABAP release, software component, package, transport:** unknown.
-- **Shared contract v0.2 approval:** unknown; do not treat the candidate as frozen.
+Verify which ABAP, RAP, authorization, concurrency, and service capabilities are available in the assigned SAP development environment before implementing the Migration Decision workflow.
 
-## Capability matrix
+Do not assume that a capability exists because it is documented in general SAP material or appears in an IDE. Mark it **VERIFIED** only after a successful observation in the assigned tenant.
 
-| Capability | State | Evidence needed in ADT |
-|---|---|---|
-| Log in to assigned tenant and identify release | NOT VERIFIED | System/project properties or supported system-information view; record exact product and release. |
-| Development package and transport | UNKNOWN | Record assigned package, software component and transport/request handling. |
-| Existing DDIC table activation | NOT RUN | Activate an approved minimal table object; record object and activation message. |
-| CDS view entity activation/read | NOT RUN | Activate a minimal approved view and read one synthetic row. |
-| ABAP class/interface activation | NOT RUN | Activate a minimal class/interface in the approved language version. |
-| ABAP Unit execution | UNKNOWN | Run a minimal local test class and record runner/result. |
-| Released UUID generation API | UNKNOWN | Check target release API state and package language version; do not guess an unreleased API. |
-| RAP behavior/service and OData version | UNKNOWN | Probe only if required by the signed architecture and package permissions. |
-| Current principal, roles and authorization checks | UNKNOWN | Record available identity/authorization APIs and approved test users. |
-| Lock/ETag or stale-update support | UNKNOWN | Record a successful permitted probe or a concrete limitation. |
-| CSV upload endpoint | UNKNOWN | No direct browser upload is assumed. Record exact supported flow if present. |
-| Staged-row CRUD fallback | UNKNOWN | Verify supported operations and tenant limits before designing a staging table. |
-| Fiori Elements preview/generation | UNKNOWN | Verify against a real service before adding UI assumptions. |
-| Request/file/row limits and approved synthetic loading | UNKNOWN | Record measured or documented limits and approved test route. |
+## 2. Environment details
 
-## Day 1 result
+| Item                                    | Current finding                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------ |
+| Development environment                 | VS Code with SAP ABAP Development Tools extension; Eclipse ADT is a fallback   |
+| SAP environment                         | SAP BTP ABAP Environment trial, as currently understood                        |
+| System identifier                       | Reported as `BTP_DEV`; verify against the connected system                     |
+| ABAP release/version                    | NOT VERIFIED                                                                   |
+| Assigned development package            | NOT VERIFIED                                                                   |
+| Software component                      | NOT VERIFIED                                                                   |
+| Transport/change-recording requirements | NOT VERIFIED                                                                   |
+| Current development authorization       | Connection is available; permitted development operations require verification |
 
-The repository baseline and test inputs are documented, but Day 1 acceptance is **BLOCKED / NOT VERIFIED** until the tenant checks above are performed and recorded. Do not mark tables, CDS, importer, RAP, Fiori, roles, or performance as passed based on file names or service-binding metadata alone.
+Do not include passwords, access tokens, client secrets, or other credentials in this document.
 
-## Evidence record to complete
+## 3. Capability checklist
 
-For each probe, record date, exact release, package, artifact name, activation/test result, transport/request ID where applicable, and the smallest supported fallback when a capability fails. Never paste client secrets, access tokens, passwords or customer evidence into this note.
+Use the following statuses consistently:
 
+* **VERIFIED** — directly observed and recorded with evidence.
+* **NOT VERIFIED** — not checked or evidence is insufficient.
+* **BLOCKED** — an attempt was made, but a permission, environment, or technical limitation prevented verification.
+* **NOT AVAILABLE** — evidence confirms the capability is unavailable in this environment.
 
-## How to collect the missing release details
+| ID   | Capability                           | Verification action                                                                     | Status       | Evidence / notes                                    |
+| ---- | ------------------------------------ | --------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------- |
+| F-01 | Correct SAP system                   | Confirm the connected system identifier in ADT/VS Code                                  | PARTIALLY VERIFIED | Record the observed identifier                      |
+| F-02 | Assigned package                     | Locate the team-approved development package and confirm permission to use it           | PARTIALLY VERIFIED | Record package name                                 |
+| F-03 | ABAP release                         | Inspect available system/product information                                            | NOT VERIFIED | Record the observed release                         |
+| F-04 | Repository object creation           | Create or inspect a permitted test object in the assigned package                       | NOT VERIFIED | Do not create objects outside the approved package  |
+| F-05 | Activation                           | Activate a permitted object and record the actual result                                | NOT VERIFIED | Capture the activation error if blocked             |
+| F-06 | CDS view entities                    | Confirm that a minimal permitted CDS view entity can be activated                       | NOT VERIFIED | Record the object type and result                   |
+| F-07 | RAP business object                  | Confirm supported RAP artifacts and whether a minimal business object can be activated  | NOT VERIFIED | Record actual supported artifact types              |
+| F-08 | RAP actions and validations          | Verify support for the actions and validations needed by the workflow                   | NOT VERIFIED | Do not infer support from documentation alone       |
+| F-09 | ABAP Unit                            | Confirm tests can be created or run in the assigned package                             | NOT VERIFIED | Record whether execution is permitted               |
+| F-10 | Authorization model                  | Identify the supported authorization mechanism for the chosen RAP implementation        | NOT VERIFIED | Record the actual mechanism                         |
+| F-11 | Current principal                    | Establish how the current authenticated user is identified in the backend               | NOT VERIFIED | Do not assume a UI username is a trusted identity   |
+| F-12 | Role checks                          | Verify how Developer, Reviewer, Admin, and Auditor permissions can be enforced          | NOT VERIFIED | Record supported role/authorization sources         |
+| F-13 | Instance authorization               | Verify that forbidden operations can be rejected by the backend                         | NOT VERIFIED | UI-only hiding does not count                       |
+| F-14 | ETag or locking                      | Verify a supported mechanism for rejecting stale updates or conflicting changes         | NOT VERIFIED | Record the mechanism and observed result            |
+| F-15 | Service definition                   | Confirm a service definition can be created and activated                               | NOT VERIFIED | Record result                                       |
+| F-16 | Service binding                      | Confirm an appropriate service binding can be created and activated                     | NOT VERIFIED | Record protocol and binding type                    |
+| F-17 | OData access                         | Verify that the resulting service can be accessed through the supported route           | NOT VERIFIED | Do not record a service as working until tested     |
+| F-18 | Fiori Elements preview               | Verify whether a supported preview is available for the service                         | NOT VERIFIED | Separate preview from deployment                    |
+| F-19 | Fiori Elements generation/deployment | Verify the permitted generation and deployment path, if required                        | NOT VERIFIED | Record any tenant restrictions                      |
+| F-20 | Synthetic test data                  | Verify an approved way to create and reset non-sensitive demo records                   | NOT VERIFIED | Use synthetic data only                             |
+| F-21 | Import integration                   | Verify the supported input path from Member 1's import work                             | NOT VERIFIED | Do not assume direct file upload is available       |
+| F-22 | CDS aggregation                      | Verify whether any required aggregation can be implemented using supported CDS features | NOT VERIFIED | Only investigate if required by the agreed contract |
 
-In ADT, select the ABAP project in Project Explorer, then open **Window → Show View → Properties → System**. SAP documents that this view displays system details and installed software-component release/support-package information: https://help.sap.com/docs/abap-cloud/abap-development-tools-user-guide/displaying-system-connection-and-database-configuration
+## 4. Minimum evidence to collect
 
-Also record the development package containing the project's objects (from the package node in Project Explorer) and the assigned transport/request flow. Share only the product/release, package name, and probe results; never share client secrets, access tokens or passwords.
+For each capability checked, record:
+
+1. The capability ID from the checklist.
+2. The action attempted.
+3. The observed result.
+4. Any exact error message, with secrets removed.
+5. The relevant object type or configuration, where applicable.
+6. The resulting status and any next step.
+
+A screenshot or short sanitized error excerpt may be retained separately if useful. Do not claim that an object, service, authorization check, or test works without observing the result.
+
+## 5. Workflow/security requirements to verify
+
+The implementation must support the agreed workflow contract before it is considered ready:
+
+* Backend enforcement of legal state transitions.
+* Backend enforcement of role permissions.
+* Separation of duties for approval and override.
+* Mandatory override reason and a strategy different from the recommendation.
+* Preservation of the original `RecommendedStrategy`.
+* Audit information for meaningful decision changes.
+* Rejection of stale or conflicting updates using a supported mechanism.
+* No state or audit changes when an action is rejected.
+* Read-only access for the Auditor role.
+* Synthetic demonstration data only.
+
+The workflow contract remains **proposed**, not frozen, until the relevant team members resolve its open decisions and confirm a shared status and field contract.
+
+## 6. Blocker handling and fallback
+
+When a capability cannot be verified:
+
+1. Mark the relevant checklist item **BLOCKED** and describe the observed limitation.
+2. Identify the smallest missing prerequisite or permission.
+3. Ask the team or environment administrator for that prerequisite if needed.
+4. Do not invent an API, use an unsupported workaround, or silently change the workflow contract.
+5. Propose the smallest supported fallback and request team agreement before implementing it.
+
+In particular, do not assume that direct CSV upload, Fiori deployment, or a specific authorization API is available. If the intended import route is unsupported, document the limitation and agree on a supported alternative with the responsible team members.
+
+## 7. Current conclusion
+
+**No capability is considered verified by this note alone.** The checklist must be updated as tenant checks are performed.
+
+RAP implementation should begin only after the minimum required object, activation, authorization, concurrency, and service capabilities have been verified—or after the team explicitly accepts a documented limitation and fallback.
+
+## 8. Review and sign-off
+
+* [ ] Member 3 — environment findings and security feasibility reviewed.
+* [ ] Member 1 — import entry path and persistence integration reviewed.
+* [ ] Member 2 — recommendation fields and rule-set integration reviewed.
+* [ ] Member 4 — service consumption and Fiori Elements requirements reviewed.
+* [ ] Team — shared workflow/status contract confirmed.
+
+**Final status:** IN PROGRESS — pending evidence and team review.
