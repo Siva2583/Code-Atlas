@@ -36,3 +36,10 @@ The repository baseline and test inputs are documented, but Day 1 acceptance is 
 ## Evidence record to complete
 
 For each probe, record date, exact release, package, artifact name, activation/test result, transport/request ID where applicable, and the smallest supported fallback when a capability fails. Never paste client secrets, access tokens, passwords or customer evidence into this note.
+
+
+## How to collect the missing release details
+
+In ADT, select the ABAP project in Project Explorer, then open **Window → Show View → Properties → System**. SAP documents that this view displays system details and installed software-component release/support-package information: https://help.sap.com/docs/abap-cloud/abap-development-tools-user-guide/displaying-system-connection-and-database-configuration
+
+Also record the development package containing the project's objects (from the package node in Project Explorer) and the assigned transport/request flow. Share only the product/release, package name, and probe results; never share client secrets, access tokens or passwords.
