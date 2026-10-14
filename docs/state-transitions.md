@@ -1,235 +1,240 @@
-# State Transitions, Roles and Audit - DRAFT v0.1 (Member 3)
+# Migration Decision Workflow, Security and Audit
 
-Status: DRAFT. Members 1, 2 and 4 please review. Statuses, action names and audit fields below become the contract for the MigrationDecision business object. None of them may change without a pull request that edits this file and a message to the team.
-All sample data is DEMO / SYNTHETIC. Nothing here is connected to a live SAP system.
+**Owner:** Member 3 — RAP Workflow & Security
+**Version:** 0.2 — Proposed for team review
+**Status:** NOT FROZEN — requires review from Members 1, 2 and 4 before implementation
+**Scope:** Migration Decision business object, workflow actions, backend authorization and audit history.
 
-This document is design only. It names no release-specific ABAP or RAP syntax. Anything that depends on the target system (draft support, ETag/locking, feature control, authorization objects) must be verified on SAP Help Portal and in the Week-1 feasibility check.
+All examples and test data must be synthetic. The cockpit records human decisions; it does not automatically migrate, retire or delete SAP objects.
 
-## 0. How to read this (plain language)
+## 1. Purpose
 
-- A decision is one record that says what we propose to do with one custom object (for example "retire it" or "rewrite it in RAP") and where that proposal is in the review process.
-- The status says where it is in that process. A transition is a move from one status to another.
-- An action is the button or call that causes a transition (Submit, Approve, Override, Return, ...).
-- The rules in this file are enforced in the backend. Hiding a button in the Fiori UI is only a convenience; the backend must reject the call anyway.
-- The system never deletes or migrates anything. A human records the outcome.
+Each Migration Decision connects one custom object to a recommendation from Member 2's rules engine. It records the review outcome, assigned owner, current workflow status and history of changes.
 
-## 1. Decision statuses
+The RAP backend is the authority for whether an action is allowed. Hiding an action in the Fiori UI is not authorization.
 
-| Status | Meaning |
-|---|---|
-| PROPOSED | A recommendation exists (from the rules engine) and the developer is preparing it. Editable. Nothing is decided. |
-| IN_REVIEW | Submitted. Waiting for a reviewer. Locked for editing. |
-| APPROVED | A reviewer accepted the recommended strategy as it is. |
-| OVERRIDDEN | A reviewer chose a different strategy than the recommended one, with a mandatory reason. |
-| RETURNED | A reviewer sent it back because evidence is missing or wrong. |
-| IN_PROGRESS | The assigned owner started the modernization work. |
-| BLOCKED | Work is stopped. A blocker reason is recorded. |
-| MIGRATED | A human recorded that the work is done. Final unless an admin reopens it. |
+## 2. Decision fields
 
-The first seven are the statuses suggested in the task. BLOCKED is added because real work stalls, and without it the only exits from IN_PROGRESS would be MIGRATED or a reopen. Decision for the team: keep BLOCKED (recommended) or drop it.
+The implementation must coordinate these fields with the owning team members before finalizing the physical data model.
 
-Strategy values are Member 2's five outcomes, unchanged: KEEP_ADAPT, REWRITE_RAP, RETIRE_CANDIDATE, SIDE_BY_SIDE_BTP, MANUAL_REVIEW. The decision keeps two fields: RecommendedStrategy (set by the engine, never edited by people) and FinalStrategy (equals RecommendedStrategy unless overridden).
+| Field                 | Purpose                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| DecisionUUID          | Stable technical identifier for a decision                                                      |
+| ObjectUUID            | Link to Member 1's persisted custom object                                                      |
+| RecommendedStrategy   | Original recommendation produced by Member 2; never manually overwritten                        |
+| FinalStrategy         | Strategy currently accepted for the decision                                                    |
+| RuleSetVersion        | Version of the rules used to produce the recommendation                                         |
+| RecommendationRunID   | Identifies the recommendation run                                                               |
+| Status                | Current workflow status                                                                         |
+| OwnerUser             | Assigned system user responsible for the work; not the free-text business owner                 |
+| CreatedBy             | User who created the decision                                                                   |
+| SubmittedBy           | User who last submitted it for review                                                           |
+| CreatedAt / ChangedAt | Server-maintained timestamps                                                                    |
+| EvidenceSummary       | Evidence or explanation associated with the recommendation, subject to the agreed data contract |
 
-## 2. Allowed and illegal transitions
+The physical types, mandatory fields and exact source names must match the agreed Member 1 and Member 2 contracts. Do not invent or silently rename fields during implementation.
 
-Rule: a transition is legal only if it is listed in the table below. Everything else is illegal (allow-list, not block-list).
+**Proposed uniqueness rule:** allow at most one active decision per `ObjectUUID`. A decision is considered inactive after it reaches `MIGRATED`. Members 1 and 2 must approve this rule before it is frozen.
 
-### 2.1 Legal transitions
+## 3. Workflow statuses
 
-| # | From | To | Action | Who (details in section 3) |
-|---|---|---|---|---|
-| 1 | (new) | PROPOSED | Create from recommendation run | system, on behalf of the developer or admin who started the run |
-| 2 | PROPOSED | IN_REVIEW | Submit | assigned owner (developer) or admin |
-| 3 | RETURNED | IN_REVIEW | Submit (resubmit) | assigned owner (developer) or admin |
-| 4 | IN_REVIEW | APPROVED | Approve | reviewer, subject to SoD |
-| 5 | IN_REVIEW | OVERRIDDEN | Override | reviewer, subject to SoD |
-| 6 | IN_REVIEW | RETURNED | Return | reviewer |
-| 7 | APPROVED | IN_PROGRESS | Start | assigned owner |
-| 8 | OVERRIDDEN | IN_PROGRESS | Start | assigned owner |
-| 9 | IN_PROGRESS | MIGRATED | MarkMigrated | assigned owner |
-| 10 | IN_PROGRESS | BLOCKED | Block | assigned owner |
-| 11 | BLOCKED | IN_PROGRESS | Unblock | assigned owner |
-| 12 | APPROVED, OVERRIDDEN, IN_PROGRESS, BLOCKED | IN_REVIEW | Reopen | reviewer or admin |
-| 13 | MIGRATED | IN_REVIEW | Reopen | admin only |
+| Status        | Meaning                                                    |
+| ------------- | ---------------------------------------------------------- |
+| `PROPOSED`    | Recommendation exists and is being prepared                |
+| `IN_REVIEW`   | Submitted and awaiting reviewer action                     |
+| `APPROVED`    | Recommended strategy accepted                              |
+| `OVERRIDDEN`  | Reviewer selected a different strategy with a reason       |
+| `RETURNED`    | Reviewer sent the decision back for correction or evidence |
+| `IN_PROGRESS` | Assigned owner has started the work                        |
+| `BLOCKED`     | Work cannot continue until a blocker is resolved           |
+| `MIGRATED`    | A human recorded completion of the modernization work      |
 
-That is 15 legal status changes in total (row 12 counts four). AssignOwner does not change the status (section 3).
+`BLOCKED` is proposed as an additional status. Team approval is required before it becomes part of the frozen contract.
 
-### 2.2 Matrix (rows = from, columns = to; Y = legal, - = illegal)
+These names must also be reconciled with any alternative status names in the project blueprint. Do not silently introduce aliases or implement two competing status vocabularies.
 
-| from \ to | PROPOSED | IN_REVIEW | APPROVED | OVERRIDDEN | RETURNED | IN_PROGRESS | BLOCKED | MIGRATED |
-|---|---|---|---|---|---|---|---|---|
-| PROPOSED | - | Y | - | - | - | - | - | - |
-| IN_REVIEW | - | - | Y | Y | Y | - | - | - |
-| APPROVED | - | Y | - | - | - | Y | - | - |
-| OVERRIDDEN | - | Y | - | - | - | Y | - | - |
-| RETURNED | - | Y | - | - | - | - | - | - |
-| IN_PROGRESS | - | Y | - | - | - | - | Y | Y |
-| BLOCKED | - | Y | - | - | - | Y | - | - |
-| MIGRATED | - | Y | - | - | - | - | - | - |
+## 4. Allowed transitions and actions
 
-### 2.3 Illegal transitions that matter most
+Only the transitions listed below are allowed. Every other transition must be rejected.
 
-| Illegal move | Why it is blocked |
-|---|---|
-| PROPOSED to APPROVED, OVERRIDDEN or IN_PROGRESS | Skips review. |
-| IN_REVIEW to IN_PROGRESS or MIGRATED | Work cannot start before a decision exists. |
-| RETURNED to APPROVED | A returned decision must be resubmitted and reviewed again. |
-| APPROVED to MIGRATED | Skips IN_PROGRESS, so there is no record that work happened. |
-| OVERRIDDEN to APPROVED (or the reverse) | A decision is approved or overridden by a review, never converted afterwards. Use Reopen. |
-| anything to PROPOSED | PROPOSED exists only at creation. Rework goes through RETURNED or Reopen. |
-| MIGRATED to anything except IN_REVIEW | Final. Only an admin Reopen, with a reason. |
-| any status to itself | Not a change. |
+| Current status | Action                     | New status    | Authorized actor                          |
+| -------------- | -------------------------- | ------------- | ----------------------------------------- |
+| New decision   | Create from recommendation | `PROPOSED`    | Authorized creation flow                  |
+| `PROPOSED`     | Submit                     | `IN_REVIEW`   | Assigned developer or admin               |
+| `RETURNED`     | Resubmit                   | `IN_REVIEW`   | Assigned developer or admin               |
+| `IN_REVIEW`    | Approve                    | `APPROVED`    | Reviewer, subject to separation of duties |
+| `IN_REVIEW`    | Override                   | `OVERRIDDEN`  | Reviewer, subject to separation of duties |
+| `IN_REVIEW`    | Return                     | `RETURNED`    | Reviewer                                  |
+| `APPROVED`     | Start                      | `IN_PROGRESS` | Assigned developer                        |
+| `OVERRIDDEN`   | Start                      | `IN_PROGRESS` | Assigned developer                        |
+| `IN_PROGRESS`  | MarkMigrated               | `MIGRATED`    | Assigned developer                        |
+| `IN_PROGRESS`  | Block                      | `BLOCKED`     | Assigned developer                        |
+| `BLOCKED`      | Unblock                    | `IN_PROGRESS` | Assigned developer                        |
+| `APPROVED`     | Reopen                     | `IN_REVIEW`   | Reviewer or admin                         |
+| `OVERRIDDEN`   | Reopen                     | `IN_REVIEW`   | Reviewer or admin                         |
+| `IN_PROGRESS`  | Reopen                     | `IN_REVIEW`   | Reviewer or admin                         |
+| `BLOCKED`      | Reopen                     | `IN_REVIEW`   | Reviewer or admin                         |
+| `MIGRATED`     | Reopen                     | `IN_REVIEW`   | Admin only                                |
 
-Version 0.1 uses IN_REVIEW as the target of Reopen instead of adding a separate REOPENED status, so the reviewer must look at it again. Decision for the team: keep it simple like this (recommended) or add REOPENED.
+`AssignOwner` is a separate action that changes the owner without changing the status. It is allowed only in `PROPOSED`, `RETURNED` or `BLOCKED`, and only for a reviewer or admin.
 
-## 3. Actions and who can do each one
+Reopening a decision requires a reason. `MIGRATED` is final unless an admin reopens it.
 
-Instance-level rule: a developer can act only on decisions where they are the assigned owner.
+The backend must reject, at minimum:
 
-| Action | From status | Developer | Reviewer | Admin | Needs a reason |
-|---|---|---|---|---|---|
-| Submit | PROPOSED, RETURNED | yes (assigned owner) | no | yes | resubmit: a short response note |
-| Approve | IN_REVIEW | no | yes (SoD) | no | no |
-| Override | IN_REVIEW | no | yes (SoD) | no | yes, mandatory (section 5) |
-| Return | IN_REVIEW | no | yes | no | yes, say what is missing |
-| AssignOwner | PROPOSED, RETURNED, BLOCKED (no status change) | no | yes | yes | no |
-| Start | APPROVED, OVERRIDDEN | yes (assigned owner) | no | no | no |
-| Block | IN_PROGRESS | yes (assigned owner) | no | no | yes, the blocker |
-| Unblock | BLOCKED | yes (assigned owner) | no | no | yes, how it was resolved |
-| MarkMigrated | IN_PROGRESS | yes (assigned owner) | no | no | yes, outcome note |
-| Reopen | APPROVED, OVERRIDDEN, IN_PROGRESS, BLOCKED | no | yes | yes | yes |
-| Reopen | MIGRATED | no | no | yes | yes |
+* Skipping review, such as `PROPOSED` directly to `APPROVED`.
+* Starting work before approval or override.
+* Moving directly from `APPROVED` to `MIGRATED`.
+* Returning a decision directly to `APPROVED` without resubmission and review.
+* Changing `APPROVED` to `OVERRIDDEN`, or vice versa, without reopening and reviewing again.
+* Any transition to `PROPOSED` after creation.
+* Any unsupported status change or a transition to the same status.
 
-Notes:
-- Submit needs an assigned owner, a RecommendedStrategy, and a recorded rule-set version and evidence summary. Without an owner, separation of duties could not be checked.
-- AssignOwner is not allowed while IN_REVIEW, so nobody can swap the owner after submitting to get around the SoD check.
-- Admin can Submit (to unblock a team) but cannot Approve or Override. This is deliberate; see section 7.
+## 5. Roles and permissions
 
-## 4. Separation-of-duties (SoD) rule
+| Capability                             | Developer             | Reviewer                             | Admin | Auditor |
+| -------------------------------------- | --------------------- | ------------------------------------ | ----- | ------- |
+| Read decisions                         | Yes                   | Yes                                  | Yes   | Yes     |
+| Submit own assigned decision           | Yes                   | No                                   | Yes   | No      |
+| Approve                                | No                    | Yes, subject to separation of duties | No    | No      |
+| Override                               | No                    | Yes, subject to separation of duties | No    | No      |
+| Return for correction                  | No                    | Yes                                  | No    | No      |
+| Assign owner                           | No                    | Yes                                  | Yes   | No      |
+| Start, block, unblock or mark migrated | Own assigned decision | No                                   | No    | No      |
+| Reopen a non-migrated decision         | No                    | Yes                                  | Yes   | No      |
+| Reopen a migrated decision             | No                    | No                                   | Yes   | No      |
+| Manage rules                           | No                    | No                                   | Yes   | No      |
+| Change or delete audit events          | No                    | No                                   | No    | No      |
 
-Rule: the person who prepared or owns a decision can never approve or override it.
+The Auditor role is proposed as read-only and needs team confirmation. Actual SAP role assignments and authorization mechanisms must be verified in the target environment.
 
-For one decision, the conflicted users are:
-1. the assigned owner (OwnerUser), and
-2. the user who created the decision (CreatedBy), and
-3. the user who last submitted it (SubmittedBy).
+A developer may perform developer actions only on decisions assigned to them.
 
-Approve and Override are rejected if the acting user is any of these. The check is on the user identity, not on the role. A person who holds both the developer and reviewer role is still blocked on their own decisions.
+## 6. Separation of duties
 
-- Applies to: Approve, Override. Not to Return (sending something back is harmless).
-- Enforced in the backend on every call. Hiding the button is not enough.
-- Configurable: a setting SoD_ENABLED, default on. When it is off, the audit event records that SoD was off (AC-04 says "when SoD is enabled").
-- Demo needs at least two users per role, or a documented role-switch test plan.
+When separation of duties (SoD) is enabled, the following users cannot approve or override the same decision:
 
-## 5. Override rule
+* The assigned owner (`OwnerUser`).
+* The decision creator (`CreatedBy`).
+* The last submitter (`SubmittedBy`).
 
-Rule: an override needs a reason, with no exceptions.
+Check user identity, not merely role membership. A user holding both developer and reviewer roles must still be blocked from approving or overriding a decision they prepared or own.
 
-- The reason is mandatory. It must not be empty or only spaces, and it needs a minimum length (illustrative: 10 characters, configurable).
-- The new strategy must be one of the five outcomes and must differ from RecommendedStrategy. Otherwise it is an Approve, not an Override.
-- FinalStrategy is set to the new strategy. RecommendedStrategy is never changed, so the original engine result is always visible.
-- The reason, old strategy and new strategy are written to the audit event in the same transaction as the change.
-- The same "reason is mandatory" rule applies to Return, Block, Unblock, MarkMigrated and Reopen.
-- Not in MVP: a second approval for overrides of high-risk objects (stand-out feature, only after the MVP is stable).
+SoD must be enforced in the backend for every action call. A UI restriction alone is insufficient.
 
-## 6. Audit events
+The draft proposes SoD enabled by default. Any ability to disable it, its authorization and its audit implications require team and security approval before implementation.
 
-Every status, strategy or owner change appends one audit event in the same transaction as the change. Events are append-only: no update and no delete are exposed, and the timestamp and actor are set by the server, never taken from the client.
+## 7. Validation rules
 
-| Field | Meaning |
-|---|---|
-| EventUUID | Technical key of the event |
-| DecisionUUID | Link to the decision (see below) |
-| SequenceNo | 1, 2, 3 ... per decision, no gaps. Unique together with DecisionUUID |
-| EventType | CREATED, SUBMITTED, APPROVED, OVERRIDDEN, RETURNED, OWNER_ASSIGNED, STARTED, BLOCKED, UNBLOCKED, MIGRATED, REOPENED |
-| ActorUser | The user who did it |
-| EventTimestamp | UTC timestamp, server time |
-| OldStatus, NewStatus | Status before and after (empty old status on CREATED) |
-| OldStrategy, NewStrategy | Final strategy before and after |
-| OldOwner, NewOwner | Owner before and after (for owner changes) |
-| Reason | The reason text. Mandatory where section 3 says so |
-| RuleSetVersion | Rule-set version of the recommendation this decision rests on |
-| RecommendationRunID | The engine run that produced the recommendation |
-| CorrelationID | Groups events from one user request or bulk action |
-| ImportBatchUUID | Optional. The import batch of the evidence, where relevant (data-contract section 6) |
-| SoDEnabled | Whether SoD was on when an Approve or Override was checked |
+* Submit requires an assigned owner, a valid recommended strategy, a rule-set version, a recommendation run ID and the agreed evidence summary.
+* Override requires a non-empty reason and a valid strategy different from `RecommendedStrategy`.
+* `RecommendedStrategy` remains unchanged after an override; `FinalStrategy` records the selected strategy.
+* Return requires a reason describing what needs correction or additional evidence.
+* Block requires a blocker reason.
+* Unblock requires a resolution note.
+* MarkMigrated requires an outcome note.
+* Reopen requires a reason.
+* Resubmission requires the agreed response note.
+* Owner assignment must be rejected while the decision is `IN_REVIEW`.
+* A second active decision for the same object must be rejected if the proposed uniqueness rule is approved.
+* Invalid transitions, invalid values, missing reasons and unauthorized calls must not partially update the decision.
 
-How an audit event links to a decision:
-- AuditEvent.DecisionUUID points to MigrationDecision.DecisionUUID. Many events belong to one decision (child of the decision in the business object, created in its transaction).
-- MigrationDecision.ObjectUUID points to CustomObject.ObjectUUID, so a full history reads: event, decision, object.
-- Decisions are never deleted, so the history cannot be orphaned.
+A minimum reason length of 10 characters is illustrative only; the team must confirm it before implementation.
 
-## 7. Roles
+## 8. Audit history
 
-| Role | Can do | Cannot do |
-|---|---|---|
-| Developer | Read decisions. Prepare evidence. Run a recommendation. On their own assigned decisions only: Submit, Start, Block, Unblock, MarkMigrated | Approve, Override, Return, Reopen, AssignOwner, manage rules |
-| Reviewer | Read all decisions and audit. Approve, Override, Return, AssignOwner, Reopen (not MIGRATED), all subject to SoD | Submit, Start, MarkMigrated, manage rules |
-| Admin | Manage and publish rule sets. AssignOwner. Reopen (the only role that can reopen MIGRATED). Submit. Read all decisions and audit | Approve, Override |
-| Auditor (optional, read-only) | Read decisions and the full audit history | Everything else |
+Every successful status, strategy or owner change must append an audit event in the same logical transaction as the decision change.
 
-Why admin cannot approve: an administrator who manages the rules and can also approve decisions would remove the independent review that is the point of the cockpit. If the team wants an emergency approver, make it a separate, logged setting.
+Proposed audit fields:
 
-The Auditor role comes from the project guide and is not in the task list; it is cheap (read only), so it is proposed here. Decision for the team.
+| Field                     | Purpose                                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| EventUUID                 | Unique audit event identifier                                                                                  |
+| DecisionUUID              | Decision being changed                                                                                         |
+| SequenceNo                | Ordered sequence number for that decision                                                                      |
+| EventType                 | Creation, submission, approval, override, return, owner assignment, start, block, unblock, migration or reopen |
+| ActorUser                 | Authenticated user who performed the action                                                                    |
+| EventTimestamp            | Server-generated UTC timestamp                                                                                 |
+| OldStatus / NewStatus     | Status before and after the action                                                                             |
+| OldStrategy / NewStrategy | Strategy before and after the action                                                                           |
+| OldOwner / NewOwner       | Owner before and after assignment changes                                                                      |
+| Reason                    | Reason supplied for actions that require one                                                                   |
+| RuleSetVersion            | Rule version associated with the recommendation                                                                |
+| RecommendationRunID       | Recommendation run identifier                                                                                  |
+| CorrelationID             | Groups events associated with the same request, if supported                                                   |
+| ImportBatchUUID           | Related evidence import batch, when applicable                                                                 |
+| SoDEnabled                | Whether SoD was enabled for the approval or override check                                                     |
 
-## 8. Review of Member 1's data contract (item 8)
+Audit history must be append-only: no update or delete operation should be exposed. Actor and timestamp must come from trusted server-side context, not client-supplied values.
 
-Reviewed: docs/data-contract.md (DRAFT v0.1) and, for the producer side, docs/rules-spec.md. Not reviewed: the table and CDS files in src/zccmc_data. At the time of this review they are empty files, so ObjectUUID's real type is unverified.
+If the decision update or audit write fails, the operation must not leave a partially applied change. A rejected action must leave the decision state unchanged and must not create a successful-change audit event.
 
-Answer: yes, ObjectUUID is the link Member 3 needs. The contract calls it the technical key of CustomObject, with the external key (SourceSystemID + ObjectType + ObjectName) unique beside it. MigrationDecision.ObjectUUID links to it.
+## 9. Concurrency and stale updates
 
-Conditions that must hold (please confirm, Member 1):
-1. ObjectUUID is created once, on first insert, and is never regenerated. Re-importing the same batch (AC-01) must keep the same ObjectUUID. If a loader ever deletes and re-inserts a row, every decision on it is orphaned.
-2. The external key cannot be renamed. If it can change, say how the UUID is handled.
-3. Objects missing from a later import are never deleted. Only last_seen moves. Decisions are never removed by an import.
-4. Please give the type of ObjectUUID and DecisionUUID (for example 16-byte UUID vs 36-character string) once the tables exist, so Member 3 uses the same one.
+The implementation must prevent a stale request from silently overwriting a newer decision.
 
-Other findings:
-- The contract says audit events link to "the ImportBatch ID". The entity key is BatchUUID. Please use BatchUUID everywhere. Section 6 here uses ImportBatchUUID.
-- business_owner (objects.csv) is a free-text business attribute, not an SAP user ID. The assigned owner used for SoD must be a system user ID, so it needs its own field on the decision (OwnerUser). Do not use business_owner for SoD.
-- There is no limit on decisions per object in the contract. Member 3 proposes: at most one active decision per ObjectUUID, where active means any status except MIGRATED. A new decision for the same object is allowed only after the previous one is MIGRATED. Please confirm with Member 2.
+Verify the target environment's supported RAP locking, ETag or equivalent concurrency mechanism. Use a mechanism supported by the actual release and service configuration. Do not claim stale-update protection until it has been tested.
 
-What Member 3 consumes from Member 2 (to agree before coding): ObjectUUID, RecommendedStrategy (the five outcomes), RuleSetVersion, RecommendationRunID, and an evidence summary or explanation text. rules-spec.md says every result records the rule-set version, but does not yet name a run ID. Please add RecommendationRunID.
+When two users attempt conflicting updates, the later stale request must receive a conflict or validation error, and the first committed decision and audit history must remain intact.
 
-What Member 3 exposes to Member 4: the status and action names in sections 1 to 3, the audit fields in section 6, and the rule that the backend decides which actions are allowed (the UI reads that, it does not decide it).
+## 10. Required tests
 
-## 9. Paper tests (14)
+Use ABAP Unit or the supported test mechanism available in the target environment. Record actual execution results; this section defines expected behavior, not proof that tests have passed.
 
-Each is a test for the later ABAP Unit or RAP test classes. Expected result for every rejection: the status is unchanged and no audit event is written.
+1. Assigned developer submits a valid `PROPOSED` decision.
+2. Submission without an owner is rejected.
+3. Illegal transitions are rejected.
+4. Reviewer approves a decision they are permitted to review.
+5. Owner, creator or last submitter cannot approve or override when SoD is enabled.
+6. A developer calling Approve directly is rejected by the backend.
+7. An admin attempting Approve or Override is rejected.
+8. Override with a blank reason is rejected.
+9. Override using the same strategy as the recommendation is rejected.
+10. Valid override preserves `RecommendedStrategy` and records the new `FinalStrategy` and reason.
+11. Return, Block, Unblock, MarkMigrated and Reopen enforce their required reasons.
+12. Audit events cannot be modified or deleted through the exposed service.
+13. Concurrent stale updates do not silently overwrite the committed decision.
+14. A second active decision for the same object is rejected if the uniqueness rule is approved.
+15. Reopening `MIGRATED` is rejected for a reviewer and allowed only for an authorized admin.
+16. Every rejected action leaves the decision unchanged and creates no successful-change audit event.
 
-| # | Case | Expected |
-|---|---|---|
-| P1 | Owner assigned, developer submits PROPOSED | IN_REVIEW. One SUBMITTED event, SequenceNo continues, old PROPOSED, new IN_REVIEW |
-| P2 | Submit with no owner assigned | Rejected |
-| P3 | PROPOSED straight to APPROVED | Rejected (illegal transition) |
-| P4 | APPROVED straight to MIGRATED | Rejected (illegal transition) |
-| P5 | Reviewer approves a decision they do not own, SoD on | APPROVED. Event has actor, server time, old IN_REVIEW, new APPROVED |
-| P6 | Reviewer who is the assigned owner tries to approve, SoD on | Rejected (SoD) |
-| P7 | A user holding both developer and reviewer roles submitted it (owner is someone else) and tries to approve | Rejected (SoD) |
-| P8 | Same as P6 with SoD off by configuration | Approved, and the event records SoD off |
-| P9 | Override with an empty or spaces-only reason | Rejected |
-| P10 | Override with a valid reason but the same strategy as recommended | Rejected |
-| P11 | Valid override | OVERRIDDEN. RecommendedStrategy unchanged, FinalStrategy new, old and new strategy and the reason in the event |
-| P12 | Developer calls Approve directly on the backend while the UI hides the button | Rejected (authorization), not just hidden |
-| P13 | Admin calls Approve | Rejected (role) |
-| P14 | Reviewer reopens MIGRATED | Rejected. Admin reopens with a reason: IN_REVIEW |
+## 11. Dependencies and team sign-off
 
-Also test: updating or deleting an audit event is impossible; two reviewers acting on the same decision at once (the second one gets a conflict, not a silent overwrite); a second active decision for the same ObjectUUID is rejected; each role against each action in section 3.
+**Member 1 — data and import**
 
-## 10. Limitations and open points
+* Confirm the stable `ObjectUUID` and its physical type.
+* Confirm the agreed data contract and import batch identifier (`BatchUUID`).
+* Ensure object UUIDs remain stable across re-imports and objects are not deleted by routine imports.
 
-- Design only. No RAP behavior definition, CDS or ABAP exists for MigrationDecision yet, and nothing here has been tested on a system.
-- Authorization design (a custom authorization object, role names) is to be agreed; names will be set in implementation and are not fixed here.
-- Draft handling, ETag/locking and feature control depend on the target release. Verify in the Week-1 feasibility check and keep a documented fallback.
-- Minimum reason length, SoD default and the admin-cannot-approve choice are illustrative and configurable. Have a reviewer from the migration or governance side validate them.
-- Denied attempts (rejected calls) are not audited in the MVP; only successful changes are.
-- The cockpit recommends and records. It never retires, deletes or migrates anything.
+**Member 2 — rules engine**
 
-## 11. Decisions that need the team
+* Confirm the strategy values: `KEEP_ADAPT`, `REWRITE_RAP`, `RETIRE_CANDIDATE`, `SIDE_BY_SIDE_BTP`, `MANUAL_REVIEW`.
+* Confirm `RuleSetVersion`, `RecommendationRunID` and the recommendation/evidence summary supplied to the decision business object.
+* Review the proposed one-active-decision-per-object rule.
 
-1. Keep BLOCKED as a status (recommended).
-2. Reopen goes to IN_REVIEW instead of a separate REOPENED status (recommended).
-3. Admin cannot approve or override (recommended).
-4. Add the read-only Auditor role (recommended).
-5. At most one active decision per ObjectUUID (needs Member 1 and Member 2).
-6. Rename the contract's "ImportBatch ID" to BatchUUID, and add RecommendationRunID to the rules output.
+**Member 4 — Fiori UI**
+
+* Align UI actions and status labels with this contract.
+* Use backend action availability and backend errors rather than treating hidden buttons as security.
+* Confirm how reasons, status changes and audit history are displayed.
+
+**All members**
+
+Review and agree on the status vocabulary, `BLOCKED`, reopen behavior, Auditor role, SoD policy, minimum reason length, and one-active-decision rule. Resolve any conflicting status names in the project blueprint before freezing the contract.
+
+## 12. Implementation limitations
+
+This document is a workflow design, not proof of a working RAP implementation.
+
+The following remain unverified until demonstrated on the assigned SAP environment:
+
+* Exact ABAP release and supported RAP syntax.
+* Business object activation and service binding.
+* OData version and service exposure.
+* Available identity and authorization APIs.
+* Locking, ETag and stale-update behavior.
+* Supported audit persistence and transaction behavior.
+
+Record unsupported capabilities and the smallest supported fallback in `docs/feasibility-note.md` and `docs/limitations.md`. Do not claim an unsupported feature or successful test.
+
+The cockpit remains a human decision and governance tool; it does not execute migrations, retirements or deletions automatically.
