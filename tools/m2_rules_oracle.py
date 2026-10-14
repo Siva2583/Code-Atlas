@@ -282,6 +282,75 @@ MONTH_CASES = [
 ]
 
 
+
+
+# ---------------------------------------------------------------- portfolio analytics (spec section 12 / Day 6)
+ALL_STRATEGIES = ("KEEP_ADAPT", "REWRITE_RAP", "RETIRE_CANDIDATE", "SIDE_BY_SIDE_BTP", "MANUAL_REVIEW")
+
+
+def compute_portfolio_summary(items: list[dict], flt: dict | None = None) -> dict:
+    """Reference model for zccmc_cl_portfolio_analytics=>compute_summary."""
+    flt = flt or {}
+    # Deduplicate by (source_system, object_type, object_name) keeping latest run_id
+    by_key: dict[tuple[str, str, str], dict] = {}
+    for raw in items:
+        sys_id = (raw.get("source_system") or "").strip().upper()
+        otype = (raw.get("object_type") or "").strip().upper()
+        oname = (raw.get("object_name") or raw.get("object_id") or "").strip().upper()
+        k = (sys_id, otype, oname)
+        run_id = raw.get("run_id") or ""
+        if k not in by_key or run_id > (by_key[k].get("run_id") or ""):
+            item = dict(raw)
+            item["source_system"] = sys_id
+            item["object_type"] = otype
+            item["object_name"] = oname
+            item["package_name"] = (raw.get("package_name") or "").strip().upper()
+            crit = (raw.get("criticality") or "").strip().upper()
+            item["criticality"] = crit if crit in ("HIGH", "MEDIUM", "LOW") else "UNKNOWN"
+            item["strategy"] = (raw.get("strategy") or "MANUAL_REVIEW").strip().upper()
+            item["missing_evidence"] = sorted({c.strip().upper() for c in raw.get("missing_evidence", []) if c.strip()})
+            by_key[k] = item
+
+    by_strategy = {s: 0 for s in ALL_STRATEGIES}
+    by_reason: dict[str, int] = {}
+    by_pkg: dict[str, int] = {}
+    total = 0
+    complete = 0
+    with_missing = 0
+
+    for k in sorted(by_key):
+        it = by_key[k]
+        if flt.get("source_system") and it["source_system"] != flt["source_system"].strip().upper():
+            continue
+        if flt.get("package_name") and it["package_name"] != flt["package_name"].strip().upper():
+            continue
+        if flt.get("criticality") and it["criticality"] != flt["criticality"].strip().upper():
+            continue
+        if flt.get("strategy") and it["strategy"] != flt["strategy"].strip().upper():
+            continue
+        if flt.get("only_missing_evidence") and not it["missing_evidence"]:
+            continue
+
+        total += 1
+        by_strategy[it["strategy"]] = by_strategy.get(it["strategy"], 0) + 1
+        if it["missing_evidence"]:
+            with_missing += 1
+            for r in it["missing_evidence"]:
+                by_reason[r] = by_reason.get(r, 0) + 1
+        else:
+            complete += 1
+        pkg = it["package_name"] or "UNSPECIFIED"
+        by_pkg[pkg] = by_pkg.get(pkg, 0) + 1
+
+    return {
+        "total_objects": total,
+        "objects_with_complete_evidence": complete,
+        "objects_with_missing_evidence": with_missing,
+        "by_strategy": by_strategy,
+        "by_missing_reason": dict(sorted(by_reason.items())),
+        "by_package": dict(sorted(by_pkg.items())),
+    }
+
 # ---------------------------------------------------------------- runner
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -365,6 +434,40 @@ def main() -> int:
         check(all(r["strategy"] == "MANUAL_REVIEW" and "NO_USAGE_FACT" in r["missing"] for r in res),
               f"{name}: objects without usage must all be MANUAL_REVIEW / NO_USAGE_FACT")
     log("perf fixtures: 1,000 and 10,000 objects evaluated (no usage loaded: all MANUAL_REVIEW, none silently lost)")
+
+    # 7. portfolio analytics reconciliation (Day 6 M2-D06-T01)
+    p_items = [
+        {
+            "source_system": o["source_system"],
+            "object_type": o["object_type"],
+            "object_name": o["object_name"],
+            "package_name": o["package"],
+            "criticality": o["criticality"],
+            "strategy": run1[o["object_name"].strip().upper()]["strategy"],
+            "missing_evidence": run1[o["object_name"].strip().upper()]["missing"],
+            "run_id": "RUN-0001",
+        }
+        for o in objects
+    ]
+    empty_sum = compute_portfolio_summary([])
+    check(empty_sum["total_objects"] == 0 and sum(empty_sum["by_strategy"].values()) == 0, "empty portfolio summary non-zero")
+    full_sum = compute_portfolio_summary(p_items)
+    check(full_sum["total_objects"] == 7, f"M-01 expected 7, got {full_sum['total_objects']}")
+    check(full_sum["by_strategy"] == {"KEEP_ADAPT": 1, "REWRITE_RAP": 0, "RETIRE_CANDIDATE": 0, "SIDE_BY_SIDE_BTP": 0, "MANUAL_REVIEW": 6},
+          f"M-02 mismatch: {full_sum['by_strategy']}")
+    check(full_sum["objects_with_missing_evidence"] == 4 and full_sum["objects_with_complete_evidence"] == 3,
+          f"M-03 counts mismatch: {full_sum}")
+    check(full_sum["by_missing_reason"] == {"CRITICALITY_UNKNOWN": 2, "NO_USAGE_FACT": 1, "WINDOW_TOO_SHORT": 1},
+          f"M-03 breakdown mismatch: {full_sum['by_missing_reason']}")
+    zsd_sum = compute_portfolio_summary(p_items, {"package_name": "ZSD_PRICING"})
+    check(zsd_sum["total_objects"] == 1 and zsd_sum["by_strategy"]["KEEP_ADAPT"] == 1 and zsd_sum["objects_with_missing_evidence"] == 0,
+          f"ZSD_PRICING filter mismatch: {zsd_sum}")
+    high_sum = compute_portfolio_summary(p_items, {"criticality": "HIGH"})
+    check(high_sum["total_objects"] == 2 and high_sum["by_strategy"]["MANUAL_REVIEW"] == 2 and high_sum["objects_with_missing_evidence"] == 0,
+          f"HIGH criticality filter mismatch: {high_sum}")
+    dup_sum = compute_portfolio_summary(p_items * 5)
+    check(dup_sum == full_sum, "joined duplicate rows inflated portfolio counts")
+    log("portfolio analytics: M-01=7, M-02 (MANUAL_REVIEW=6, KEEP_ADAPT=1), M-03=4, filters, empty & join-dedup checked")
 
     log("")
     log("RESULT: " + ("ALL CHECKS PASSED" if failures == 0 else f"{failures} CHECK(S) FAILED"))

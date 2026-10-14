@@ -33,7 +33,23 @@ Status legend. "Oracle" = tools/m2_rules_oracle.py, a Python reference model tha
 
 Open decisions that can change these expectations: docs/m2-contract-review.md C1 to C14.
 Not tested: REWRITE_RAP and SIDE_BY_SIDE_BTP (no source data), portfolio metrics (none agreed), rule-set persistence and immutability (no entity yet).
-Running everything: python tools/m2_rules_oracle.py (records in docs/m2-golden-results.md); ABAP Unit in ADT with Ctrl+Shift+F10 on class ZCCMC_UT_RULE_ENGINE.
+Running everything: python tools/m2_rules_oracle.py (records in docs/m2-golden-results.md); ABAP Unit in ADT with Ctrl+Shift+F10 on classes ZCCMC_UT_RULE_ENGINE and ZCCMC_UT_PORTFOLIO_ANALYTICS.
+
+## Portfolio Analytics : unit tests and reconciliation status (Member 2 — Day 6 `M2-D06-T01`)
+
+ABAP Unit class: `src/zccmc_test/zccmc_ut_portfolio_analytics.clas.abap` testing `src/zccmc_core/zccmc_cl_portfolio_analytics.clas.abap`.
+
+| Test | Expected | Sample CSV fixture | ABAP Unit method | Status |
+|---|---|---|---|---|
+| PA-T01 Empty portfolio (`0` items) | `total_objects = 0`, all 5 strategy counts `0`, no missing reasons | empty list | `T01` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T02 Full 7-object sample reconciliation | `M-01 = 7`; `M-02`: `MANUAL_REVIEW = 6`, `KEEP_ADAPT = 1`; `M-03 = 4` (`CRITICALITY_UNKNOWN = 2`, `NO_USAGE_FACT = 1`, `WINDOW_TOO_SHORT = 1`) | all 7 sample objects | `T02` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T03 Filter by `package_name` & `criticality` | `ZSD_REPORTS` → `1 MANUAL_REVIEW`; `ZSD_PRICING` → `1 KEEP_ADAPT`; `criticality = HIGH` → `2 MANUAL_REVIEW` | `objects.csv` packages | `T03` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T04 Filter by `source_system` | `DEMO_SYS` → `7`; `NON_EXISTENT_SYS` → `0` | `objects.csv` | `T04` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T05 Filter by `strategy` and `only_missing_evidence` | `KEEP_ADAPT` → `1`; `only_missing_evidence = true` → `4` | all 7 sample objects | `T05` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T06 1:N join duplicate row & reason-code deduplication | 6 repeated rows for 1 object still yield `total_objects = 1` and `reason_count = 1` | simulated join rows | `T06` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T07 Multi-run deduplication (latest run wins) | `RUN-0002` supersedes `RUN-0001` for the same object key | in-code 2-run fixture | `T07` | Oracle passed. ABAP Unit written, pending ADT run. |
+| PA-T08 Input row-order determinism | Reversed item table produces identical `ty_summary` | all 7 sample objects | `T08` | Oracle passed. ABAP Unit written, pending ADT run. |
+
 
 ---
 
