@@ -128,3 +128,26 @@ Deterministic rules only. No ML and no claim of predictive accuracy.
 Sample data is synthetic and labeled DEMO / SYNTHETIC.
 Thresholds and weights are illustrative until validated by a migration expert.
 Evidence comes from CSV import only. Live adapters are future work.
+
+10. Rule-to-field map 
+
+| Rule / condition | Source entity.field | Available in contract? |
+|---|---|---|
+| R10: no usage row | UsageFact row exists for ObjectUUID | Yes |
+| R10: window shorter than 12 whole months | UsageFact.period_start, period_end | Yes |
+| R10: criticality UNKNOWN | CustomObject.criticality | Yes (empty CSV value must normalize to UNKNOWN, to confirm) |
+| R10: evidence older than 30 days | UsageFact.evidence_as_of vs evaluation date | Yes, usage only. Needs an evaluation_date input |
+| R10: findings not known to be loaded | none | GAP: no per-object findings indicator |
+| R10/section 4: run_count = 0 but last_executed set | UsageFact.run_count, last_executed | Yes |
+| R10/section 4: run_count > 0 but last_executed empty | UsageFact.run_count, last_executed | Yes |
+| R10/section 4: period_end before period_start | UsageFact.period_start, period_end | Yes |
+| R20: run_count = 0 | UsageFact.run_count | Yes |
+| R20: not called by a HIGH-criticality object | Dependency (To = this object) joined to caller's CustomObject.criticality | Yes, derived (to confirm) |
+| R30/R60: used (run_count > 0) | UsageFact.run_count | Yes |
+| R30/R60: count of HIGH findings | Finding.severity | Yes (INFO ignored) |
+| Tie at same priority (section 4) | rule table: priority, outcome, active flag | Rule config, not CSV data |
+| REWRITE_RAP (prio 40) | transactional / reuse | GAP: no field |
+| SIDE_BY_SIDE_BTP (prio 50) | external integration / released-API boundary | GAP: no field |
+
+Engine inputs that are not CSV fields: evaluation_date (so freshness is
+deterministic in tests), rule-set version, RecommendationRunID
