@@ -1,6 +1,6 @@
 Rules Specification - DRAFT 
 
-Status: DRAFT. Members 1, 3 and 4 please review. Field names follow docs/data-contract.md (Member 1, v0.1). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
+Status: DRAFT. Members 1, 3 and 4 please review. Field names follow docs/data-contract.md (Member 1, v0.1; candidate v0.2 is not signed and is not yet the rules input contract). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
 
 The rules are deterministic: the same inputs and the same published rule-set version always give the same result. This is a rules engine, not AI or machine learning.
 
@@ -79,7 +79,7 @@ Dependency	from and to object, dependency_type	Find callers, derive "called by a
 
 Missing or unclear, to raise with Member 1:
 
-Findings loaded vs. none found. Objects with no findings rows cannot be told apart from objects whose findings were never loaded. We need a per-object indicator (for example a findings_as_of date) or an agreed row convention.
+Findings loaded vs. none found. Objects with no findings rows cannot be told apart from objects whose findings were never loaded. We need a per-object indicator (for example a findings_as_of date) or an agreed row convention. Member 1 candidate v0.2 proposes optional objects.findings_as_of for this purpose; it remains a GAP until M2–M4 approve the field and downstream rules are updated.
 evidence_as_of exists only on usage. Findings and dependencies have no as-of date, so freshness is checked on usage only.
 No data for REWRITE_RAP and SIDE_BY_SIDE_BTP. Nothing says an object is transactional, has high reuse or has an external integration. Either add optional columns or these two outcomes stay untestable.
 "Critical dependency" is derived, not stored (an object is critical if called by a HIGH-criticality object). Please confirm.
