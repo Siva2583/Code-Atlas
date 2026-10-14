@@ -50,6 +50,24 @@ Running everything: python tools/m2_rules_oracle.py (records in docs/m2-golden-r
 | M1-D02-01 | Compare candidate v0.2 headers with all templates. | Exact ordered match including objects.findings_as_of. | Run tools/validate_import_fixtures.py after checkout; shared sign-off pending. |
 | M1-D02-02 | Verify every named edge fixture has an explicit result. | See M1-D04-01 through M1-D04-06. | Candidate result codes are in docs/import-design.md. |
 
+Determinism: run all tests twice and with shuffled input order. Only
+RecommendationRunID and RunTimestamp may differ.
+
+---
+
+# Test Matrix — Member 1 import scope through Day 8
+
+**Status:** expected behaviors below are the Member 1 candidate oracle in docs/data-contract.md. Only offline fixture structure is runnable from a normal checkout. ABAP Unit and SAP import results must be recorded from the assigned ADT tenant; they are not inferred from a CSV parse.
+
+## Day 1–2: baseline and contract
+
+| ID | Scenario | Expected result | Evidence / state |
+|---|---|---|---|
+| M1-D01-01 | Compare each of four original template headers with v0.1 contract. | Exact ordered match. | Verified against branch head 3006fb0. |
+| M1-D01-02 | Inspect table, view, importer and ABAP Unit contents. | Record fields, keys, activation and entry point. | Files are 0 bytes; SAP activation/access result pending. |
+| M1-D02-01 | Compare candidate v0.2 headers with all templates. | Exact ordered match including objects.findings_as_of. | Run tools/validate_import_fixtures.py after checkout; shared sign-off pending. |
+| M1-D02-02 | Verify every named edge fixture has an explicit result. | See M1-D04-01 through M1-D04-06. | Candidate result codes are in docs/import-design.md. |
+
 ## Day 3–6: persistence and loader behavior
 
 | ID | Scenario | Expected result | State |

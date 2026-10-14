@@ -1,6 +1,6 @@
 Rules Specification - DRAFT 
 
-Status: Field names follow docs/data-contract.md (Member 1, v0.1; candidate v0.2 is not signed and is not yet the rules input contract). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
+Status: DRAFT. Field names follow docs/data-contract.md (Member 1, v0.1; candidate v0.2 is not signed and is not yet the rules input contract). All sample data is DEMO / SYNTHETIC. Every threshold and weight below is illustrative and configurable. None is hardcoded, and a migration/domain expert must validate them before any real use.
 
 The rules are deterministic: the same inputs and the same published rule-set version always give the same result. This is a rules engine, not AI or machine learning.
 
@@ -77,13 +77,6 @@ UsageFact	period_start, period_end, last_executed, run_count, evidence_source, e
 Finding	severity, finding_id (and category for display)	Counts by severity
 Dependency	from and to object, dependency_type	Find callers, derive "called by a HIGH-criticality object"
 
-Missing or unclear, to raise with Member 1:
-
-Findings loaded vs. none found. Objects with no findings rows cannot be told apart from objects whose findings were never loaded. We need a per-object indicator (for example a findings_as_of date) or an agreed row convention. Member 1 candidate v0.2 proposes optional objects.findings_as_of for this purpose; Member 2 conditionally approves it (docs/m2-contract-review.md, A1 to A3). The engine treats a blank findings_as_of as FINDINGS_NOT_LOADED. Still pending sign-off by M3 and M4.
-evidence_as_of exists only on usage. Findings and dependencies have no as-of date, so freshness is checked on usage only.
-No data for REWRITE_RAP and SIDE_BY_SIDE_BTP. Nothing says an object is transactional, has high reuse or has an external integration. Either add optional columns or these two outcomes stay untestable.
-"Critical dependency" is derived, not stored (an object is critical if called by a HIGH-criticality object). Please confirm.
-Sample data coverage. With v0.2 the 7 sample objects reach only KEEP_ADAPT (1) and MANUAL_REVIEW (6). No sample object can reach RETIRE_CANDIDATE, REWRITE_RAP or SIDE_BY_SIDE_BTP. Please add rows for T1, T3, T4, T10, T11 and a stale evidence_as_of, labeled DEMO / SYNTHETIC. The ABAP Unit tests carry these cases as in-code data, so they are not blocked.
 7. Review of the data contract: severity and criticality values
 
 Severity (HIGH | MEDIUM | LOW | INFO)
