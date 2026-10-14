@@ -15,7 +15,7 @@ The repository work below is a reviewable proposal. This status distinguishes co
 | Day 5 — loaders | Documented repeat-import and corrected-batch outcomes; added corrected fixture. | Object/usage/finding/dependency loaders and idempotency tests remain unimplemented and unrun. |
 | Day 6 — provenance | Specified per-row accepted/rejected provenance, batch digest/counts and append-only correction behavior. | Required persistence objects are empty/unactivated; prior-batch provenance is not yet demonstrated. |
 | Day 7 — references | Documented object-first order, UNKNOWN_OBJECT errors, no deferred replay and file-level rollback for fatal persistence failures. | Integration/order/failure tests need the activated importer and tenant. |
-| Day 8 — edges and scale | Materialized all named edge fixtures and 1k/10k synthetic object inputs; added an offline fixture checker. | The checker is only a local CSV structure/read baseline. SAP loader timings, importer idempotency and ABAP Unit results are explicitly not measured. |
+| Day 8 — edges and scale | Materialized all named edge fixtures and 1k/10k synthetic object inputs; added and ran the offline fixture checker. It verified 1,000 rows / 101,121 bytes / 0.0036s and 10,000 rows / 1,010,121 bytes / 0.0378s on Python 3.12.14 (Windows workspace, 2026-10-14). | These are Python csv.reader timings only. SAP loader timings, importer idempotency and ABAP Unit results are explicitly not measured. |
 
 ## Current gate
 

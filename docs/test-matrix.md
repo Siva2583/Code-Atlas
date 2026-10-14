@@ -57,7 +57,7 @@ RecommendationRunID and RunTimestamp may differ.
 | M1-D07-01 | Import objects, usage, findings, dependencies in order. | All in-scope references resolve; counts reconcile. | Needs SAP importer. |
 | M1-D07-02 | Import dependent files before objects, then load objects. | Dependents are rejected UNKNOWN_OBJECT and are not silently replayed; object state reflects only committed rows. | Candidate policy; needs SAP importer. |
 | M1-D07-03 | Inject fatal persistence failure. | Current file's business writes roll back; batch is FAILED; no half-persisted file. | Needs tenant fault-injection method; not run. |
-| M1-D08-01 | Parse 1,000-row and 10,000-row fixtures locally. | Exact row count and unique object key for every row; timings reported as offline CSV-reader baseline only. | Run the fixture checker; this is not an ABAP/SAP performance result. |
+| M1-D08-01 | Parse 1,000-row and 10,000-row fixtures locally. | Exactly 1,000 / 10,000 unique rows; 101,121 / 1,010,121 bytes; offline parse 0.0036s / 0.0378s. | Passed with Python 3.12.14 on the Windows workspace, 2026-10-14. Python csv.reader only; not an ABAP/SAP performance result. |
 | M1-D08-02 | Repeat a performance file. | No duplicate business keys; importer reports UNCHANGED and retains another batch's provenance. | Needs SAP importer. |
 | M1-D08-03 | Re-run all edge files through the activated importer. | Outcomes match M1-D04; accepted + rejected equals parsed for every file. | Not run; tenant and implementation required. |
 
