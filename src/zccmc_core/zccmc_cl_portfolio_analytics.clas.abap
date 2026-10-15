@@ -6,6 +6,10 @@
 "! - M-03: Objects with non-empty MissingEvidence (unresolved inputs) and breakdown by reason code.
 "! - Additional groupings for UI filters: by source_system, package, and criticality.
 "!
+"! STATUS: the metrics M-01 to M-03 are still PROPOSED in rules-spec section 12 until the
+"! team agrees them. The extra groupings (source system, package, criticality) are not in
+"! that section and are not agreed. Not yet compiled or run in ABAP Unit.
+"!
 "! Design guarantees:
 "! - Plain ABAP types (string, i, utclong, abap_boolean) with zero DB/UI coupling so this class
 "!   compiles and runs in ABAP Unit independently of Member 1 tables or Member 3 RAP views.
@@ -71,9 +75,9 @@ CLASS zccmc_cl_portfolio_analytics DEFINITION
 
     TYPES:
       BEGIN OF ty_summary,
-        total_objects                  TYPE i, "M-01
+        total_objects                  TYPE i,                     "M-01
         objects_with_complete_evidence TYPE i,
-        objects_with_missing_evidence  TYPE i, "M-03 headline count
+        objects_with_missing_evidence  TYPE i,                     "M-03 headline count
         by_strategy                    TYPE ty_strategy_count_tab, "M-02
         by_missing_reason              TYPE ty_reason_count_tab,   "M-03 breakdown
         by_source_system               TYPE ty_group_count_tab,
@@ -115,10 +119,10 @@ CLASS zccmc_cl_portfolio_analytics DEFINITION
                 is_filter         TYPE ty_filter
       RETURNING VALUE(rv_matches) TYPE abap_boolean.
 
+    " Parameter kinds must be declared in this order: IMPORTING, EXPORTING, CHANGING, RETURNING.
     CLASS-METHODS increment_group
-       EXPORTING VALUE(ev_dummy) TYPE i
-      CHANGING  ct_groups       TYPE ty_group_count_tab
-      IMPORTING iv_key          TYPE string.
+      IMPORTING iv_key    TYPE string
+      CHANGING  ct_groups TYPE ty_group_count_tab.
 ENDCLASS.
 
 
@@ -153,15 +157,21 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD normalize_key.
-    DATA(lv_id)   = to_upper( condense( is_item-object_id ) ).
+    " One key shape for every item: SYSTEM|TYPE|NAME (object_id is used when there is no name).
+    " The same object therefore gets the same key whether it was built with
+    " build_item_from_result or supplied directly. Inside a string template a literal
+    " vertical bar must be written as \|.
     DATA(lv_sys)  = to_upper( condense( is_item-source_system ) ).
     DATA(lv_type) = to_upper( condense( is_item-object_type ) ).
     DATA(lv_name) = to_upper( condense( is_item-object_name ) ).
+    IF lv_name IS INITIAL.
+      lv_name = to_upper( condense( is_item-object_id ) ).
+    ENDIF.
 
-    IF lv_sys IS NOT INITIAL OR lv_type IS NOT INITIAL OR lv_name IS NOT INITIAL.
-      rv_key = |{ lv_sys }|{ lv_type }|{ COND string( WHEN lv_name IS NOT INITIAL THEN lv_name ELSE lv_id ) }|.
+    IF lv_sys IS INITIAL AND lv_type IS INITIAL AND lv_name IS INITIAL.
+      CLEAR rv_key.   "no identity at all: the caller skips this item
     ELSE.
-      rv_key = lv_id.
+      rv_key = |{ lv_sys }\|{ lv_type }\|{ lv_name }|.
     ENDIF.
   ENDMETHOD.
 
@@ -176,7 +186,8 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
         item          TYPE ty_portfolio_item,
       END OF ty_keyed_item.
 
-    DATA lt_keyed TYPE STANDARD TABLE OF ty_keyed_item WITH EMPTY KEY.
+    DATA lt_keyed       TYPE STANDARD TABLE OF ty_keyed_item WITH EMPTY KEY.
+    DATA lt_clean_codes TYPE zccmc_cl_rule_engine=>ty_code_tab.
 
     LOOP AT it_items INTO DATA(ls_raw).
       DATA(ls_norm) = ls_raw.
@@ -191,7 +202,6 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
       ENDIF.
 
       " Deduplicate missing_evidence codes within the single item
-      DATA lt_clean_codes TYPE zccmc_cl_rule_engine=>ty_code_tab.
       CLEAR lt_clean_codes.
       LOOP AT ls_raw-missing_evidence INTO DATA(lv_code).
         DATA(lv_norm_code) = to_upper( condense( lv_code ) ).
@@ -263,7 +273,6 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD increment_group.
-    ev_dummy = 0.
     DATA(lv_clean_key) = COND string( WHEN iv_key IS NOT INITIAL THEN iv_key ELSE 'UNSPECIFIED' ).
     ASSIGN ct_groups[ group_key = lv_clean_key ] TO FIELD-SYMBOL(<ls_group>).
     IF sy-subrc = 0.

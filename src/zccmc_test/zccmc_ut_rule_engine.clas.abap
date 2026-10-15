@@ -1,7 +1,7 @@
 "! ABAP Unit tests for ZCCMC_CL_RULE_ENGINE (Member 2). DEMO / SYNTHETIC data only.
 "!
 "! STATUS: written without access to the ADT tenant. NOT compiled and NOT run. Run the whole
-"! class in ADT (Ctrl+Shift+F10) and record the result in docs/m2-day1-day8-status.md.
+"! class in ADT (Ctrl+Shift+F10) and record the result per method in docs/test-matrix.md.
 "! The expected values come from docs/rules-spec.md and docs/m2-golden-results.md. Those
 "! values were first computed by tools/m2_rules_oracle.py, an independent reference model.
 CLASS zccmc_ut_rule_engine DEFINITION
@@ -21,9 +21,9 @@ CLASS zccmc_ut_rule_engine DEFINITION
       " ---- the 10 paper tests of docs/rules-spec.md section 5 ----
       t01_no_use_12_months_retire        FOR TESTING,
       t02_no_use_11_months_manual        FOR TESTING,
-      t03_no_use_high_caller_no_match    FOR TESTING,
-      t04_used_high_zero_findings_keep   FOR TESTING,
-      t05_used_one_high_finding_manual   FOR TESTING,
+      t03_high_caller_no_match    FOR TESTING,
+      t04_used_zero_findings_keep   FOR TESTING,
+      t05_one_high_finding_manual   FOR TESTING,
       t06_used_low_finding_keep          FOR TESTING,
       t07_criticality_unknown_manual     FOR TESTING,
       t08_no_usage_row_manual            FOR TESTING,
@@ -45,7 +45,7 @@ CLASS zccmc_ut_rule_engine DEFINITION
       " ---- details ----
       t22_info_and_medium_not_high       FOR TESTING,
       t23_whole_months_boundaries        FOR TESTING,
-      t24_result_fields_and_explanation  FOR TESTING,
+      t24_result_and_explanation  FOR TESTING,
       " ---- determinism and permutation ----
       t25_repeat_run_is_identical        FOR TESTING,
       t26_row_order_does_not_matter      FOR TESTING,
@@ -156,7 +156,7 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
                    it_missing = VALUE #( ( `WINDOW_TOO_SHORT` ) ) iv_msg = 'T2' ).
   ENDMETHOD.
 
-  METHOD t03_no_use_high_caller_no_match.
+  METHOD t03_high_caller_no_match.
     " A HIGH-criticality caller blocks R20; R30 and R60 need usage, so nothing matches.
     DATA(ls_evidence) = unused_evidence( ).
     ls_evidence-callers = VALUE #( ( criticality = 'HIGH' ) ).
@@ -166,14 +166,14 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
                    it_missing = VALUE #( ( `NO_RULE_MATCH` ) ) iv_msg = 'T3' ).
   ENDMETHOD.
 
-  METHOD t04_used_high_zero_findings_keep.
+  METHOD t04_used_zero_findings_keep.
     " Boundary: zero findings, coverage known by findings_as_of.
     DATA(ls_result) = evaluate( used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ) ).
     assert_result( is_result = ls_result iv_strategy = 'KEEP_ADAPT'
                    it_matched = VALUE #( ( `R60` ) ) it_missing = VALUE #( ) iv_msg = 'T4' ).
   ENDMETHOD.
 
-  METHOD t05_used_one_high_finding_manual.
+  METHOD t05_one_high_finding_manual.
     DATA(ls_evidence) = used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ).
     ls_evidence-findings = VALUE #( ( severity = 'HIGH' ) ).
     DATA(ls_result) = evaluate( ls_evidence ).
@@ -408,7 +408,7 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
                                         exp = 0 msg = 'end before start' ).
   ENDMETHOD.
 
-  METHOD t24_result_fields_and_explanation.
+  METHOD t24_result_and_explanation.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     DATA(ls_evidence) = used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ).
     ls_evidence-findings = VALUE #( ( severity = 'HIGH' ) ( severity = 'HIGH' ) ( severity = 'MEDIUM' ) ).
