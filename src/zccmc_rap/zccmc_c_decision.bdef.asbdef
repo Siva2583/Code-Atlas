@@ -1,0 +1,28 @@
+projection;
+strict ( 2 );
+use etag;
+
+/* Proposed RAP Projection Behavior Definition for ZCCMC_C_Decision (Member 3) */
+define behavior for ZCCMC_C_Decision alias Decision
+{
+  use create;
+
+  use action submitDecision;
+  use action resubmitDecision;
+  use action approveDecision;
+  use action overrideDecision;
+  use action returnDecision;
+  use action assignOwner;
+  use action startWork;
+  use action blockWork;
+  use action unblockWork;
+  use action markMigrated;
+  use action reopenDecision;
+
+  use association _AuditTrail;
+}
+
+define behavior for ZCCMC_C_DecisionAudit alias AuditEvent
+{
+  /* Strictly read-only / append-only in projection: no update or delete exposed */
+}
