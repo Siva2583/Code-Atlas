@@ -132,7 +132,7 @@ CLASS zccmc_cl_rule_engine DEFINITION
         matched_rule_ids TYPE ty_code_tab,
         run_timestamp    TYPE utclong,
       END OF ty_result,
-      ty_result_tab TYPE STANDARD TABLE OF ty_result WITH EMPTY KEY,
+      ty_result_tab   TYPE STANDARD TABLE OF ty_result   WITH EMPTY KEY,
       ty_evidence_tab TYPE STANDARD TABLE OF ty_evidence WITH EMPTY KEY.
 
     "! Seed rule set from docs/rules-spec.md section 5 (R10, R20, R30, R60).
@@ -226,24 +226,6 @@ CLASS zccmc_cl_rule_engine DEFINITION
     CLASS-METHODS date_text
       IMPORTING iv_date        TYPE d
       RETURNING VALUE(rv_text) TYPE string.
-  METHOD evaluate_portfolio.
-    DATA(ls_ruleset) = is_ruleset.
-    IF ls_ruleset IS INITIAL.
-      ls_ruleset = seed_ruleset( ).
-    ENDIF.
-
-    DATA(lt_sorted_evidence) = it_evidence.
-    SORT lt_sorted_evidence BY object_id ASCENDING.
-
-    LOOP AT lt_sorted_evidence INTO DATA(ls_evidence).
-      APPEND evaluate_object( is_evidence        = ls_evidence
-                              is_ruleset         = ls_ruleset
-                              iv_evaluation_date = iv_evaluation_date
-                              iv_run_id          = iv_run_id
-                              iv_run_timestamp   = iv_run_timestamp ) TO rt_results.
-    ENDLOOP.
-  ENDMETHOD.
-
 ENDCLASS.
 
 
@@ -580,6 +562,7 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
                                                iv_evidence_problem = lv_evidence_problem
                                                iv_reason           = lv_reason ).
   ENDMETHOD.
+
 
   METHOD evaluate_portfolio.
     DATA(ls_ruleset) = is_ruleset.
