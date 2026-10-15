@@ -159,10 +159,12 @@ The workflow contract, allowed transitions, validation requirements, audit field
 
 The current UI work is a prototype built with SAP Fiori elements and synthetic local data:
 
-* **Portfolio overview:** `src/zccmc_ui/portfolio-overview/` contains a Fiori elements OData V4 List Report prototype for portfolio items, with filter and chart annotations and a local mock-data setup.
-* **Custom-object experience:** `src/zccmc_ui/fiori-app/` contains a Fiori app scaffold for the custom-object list and detail experience. Its routes and mock preview are for local validation; they are not a published SAP service.
+* **Combined portfolio experience:** `src/zccmc_ui/portfolio-overview/` is the canonical local mock app. It presents the Clean Core Portfolio Overview list and navigates each portfolio item to its Object Page with the synthetic object details. Running `npm run start-mock` from `src/zccmc_ui/fiori-app/` delegates to this app as well.
+* **Custom-object scaffold:** `src/zccmc_ui/fiori-app/` remains a generated starter scaffold; its `start-mock` command now launches the combined portfolio experience.
 * **Design and demo references:** [`docs/architecture.md`](docs/architecture.md) describes the five planned UI pages, and [`docs/demo-script.md`](docs/demo-script.md) outlines the intended synthetic-data walkthrough.
 
 **Current limitations:** These prototypes use local metadata/mock data and placeholder service URLs. They are not connected to an activated RAP business object or a live OData service. The portfolio overview and the decision-workflow proposal also use status vocabularies that still require alignment before the UI contract is finalized. Import Center, Rules Administration, and end-to-end backend integration remain planned work; no production-readiness or SAP-system integration is claimed.
 
-**QA focus:** Validate that the Fiori app launches with its local mock service, that list filters/navigation and displayed annotations match the agreed data and workflow contracts, and that documented demo flows use synthetic data. Record browser/build/test results when those checks are run; a successful local preview does not prove backend authorization, RAP behavior, or service activation.
+**Run the combined local preview:** run `npm run start-mock` from either `src/zccmc_ui/portfolio-overview/` or `src/zccmc_ui/fiori-app/`.
+
+**QA focus:** Validate that the combined Fiori app launches with its local mock service, that list filters/navigation and displayed annotations match the agreed data and workflow contracts, and that documented demo flows use synthetic data. Record browser/build/test results when those checks are run; a successful local preview does not prove backend authorization, RAP behavior, or service activation.

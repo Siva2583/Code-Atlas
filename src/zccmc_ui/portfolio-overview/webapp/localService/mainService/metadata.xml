@@ -20,6 +20,12 @@
                 <Property Name="RiskCategory" Type="Edm.String" MaxLength="20"/>
                 <Property Name="DecisionStatus" Type="Edm.String" MaxLength="30"/>
                 <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
+                <Property Name="SourceSystemID" Type="Edm.String" MaxLength="40"/>
+                <Property Name="Description" Type="Edm.String" MaxLength="500"/>
+                <Property Name="BusinessOwner" Type="Edm.String" MaxLength="120"/>
+                <Property Name="FirstSeen" Type="Edm.Date"/>
+                <Property Name="LastSeen" Type="Edm.Date"/>
+                <Property Name="EvidenceAsOf" Type="Edm.Date"/>
                 <Property Name="TotalCount" Type="Edm.Int32"/>
             </EntityType>
             <EntityContainer Name="Service">
@@ -39,8 +45,18 @@
                 <!-- KPI Tag / Header Metric -->
                 <Annotation Term="UI.HeaderInfo">
                     <Record Type="UI.HeaderInfo">
-                        <PropertyValue Property="TypeName" String="Object"/>
-                        <PropertyValue Property="TypeNamePlural" String="Portfolio Overview"/>
+                        <PropertyValue Property="TypeName" String="Portfolio Item"/>
+                        <PropertyValue Property="TypeNamePlural" String="Portfolio Items"/>
+                        <PropertyValue Property="Title">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectName"/>
+                            </Record>
+                        </PropertyValue>
+                        <PropertyValue Property="Description">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectType"/>
+                            </Record>
+                        </PropertyValue>
                     </Record>
                 </Annotation>
                 <!-- Chart 1: Proposed Strategy Distribution (Donut) -->
@@ -103,6 +119,67 @@
                         <Record Type="UI.DataField">
                             <PropertyValue Property="Value" Path="DecisionStatus"/>
                             <PropertyValue Property="Label" String="Decision Status"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Identification">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="SourceSystemID"/>
+                            <PropertyValue Property="Label" String="Source System"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectType"/>
+                            <PropertyValue Property="Label" String="Object Type"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="PackageName"/>
+                            <PropertyValue Property="Label" String="Package"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Description"/>
+                            <PropertyValue Property="Label" String="Description"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Criticality"/>
+                            <PropertyValue Property="Label" String="Business Criticality"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+                            <PropertyValue Property="Label" String="Recommended Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RiskCategory"/>
+                            <PropertyValue Property="Label" String="Risk Level"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="DecisionStatus"/>
+                            <PropertyValue Property="Label" String="Decision Status"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="BusinessOwner"/>
+                            <PropertyValue Property="Label" String="Business Owner"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="FirstSeen"/>
+                            <PropertyValue Property="Label" String="First Seen"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="LastSeen"/>
+                            <PropertyValue Property="Label" String="Last Seen"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="EvidenceAsOf"/>
+                            <PropertyValue Property="Label" String="Evidence As Of"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Facets">
+                    <Collection>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="ObjectSummary"/>
+                            <PropertyValue Property="Label" String="Object Summary"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.Identification"/>
                         </Record>
                     </Collection>
                 </Annotation>

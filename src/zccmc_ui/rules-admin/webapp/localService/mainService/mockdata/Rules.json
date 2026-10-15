@@ -1,0 +1,18 @@
+[
+  {
+    "RuleUUID": "aa111111-0001-1ee9-8080-005056a00001",
+    "RuleID": "RULE_RETIRE_UNUSED",
+    "RulePriority": 10,
+    "TargetOutcome": "RETIRE",
+    "ConditionSummary": "Production usage = 0 across 365 days AND LastSeen > 1 year",
+    "IsActive": true
+  },
+  {
+    "RuleUUID": "aa111111-0001-1ee9-8080-005056a00002",
+    "RuleID": "RULE_DIRECT_DB_WRITE",
+    "RulePriority": 20,
+    "TargetOutcome": "REFACTOR_CLEAN_CORE",
+    "ConditionSummary": "Direct INSERT/UPDATE on standard tables (VBAK, VBAP)",
+    "IsActive": true
+  }
+]

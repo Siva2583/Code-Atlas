@@ -24,9 +24,21 @@
         <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
         <Property Name="TotalCount" Type="Edm.Int32"/>
       </EntityType>
+      <EntityType Name="ImportBatch">
+        <Key>
+          <PropertyRef Name="BatchID"/>
+        </Key>
+        <Property Name="BatchID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+        <Property Name="EvidenceProvenance" Type="Edm.String" MaxLength="80"/>
+        <Property Name="RecordsInserted" Type="Edm.Int32"/>
+        <Property Name="RecordsUpdated" Type="Edm.Int32"/>
+        <Property Name="RecordsRejected" Type="Edm.Int32"/>
+        <Property Name="CreatedAt" Type="Edm.Date"/>
+      </EntityType>
 
       <EntityContainer Name="Service">
         <EntitySet Name="PortfolioItems" EntityType="ZCCMC_C_PORTFOLIO.PortfolioItem"/>
+        <EntitySet Name="ImportBatches" EntityType="ZCCMC_C_PORTFOLIO.ImportBatch"/>
       </EntityContainer>
 
       <Annotations Target="ZCCMC_C_PORTFOLIO.PortfolioItem">
@@ -115,8 +127,57 @@
             </Record>
           </Collection>
         </Annotation>
-
       </Annotations>
+<Annotations Target="ZCCMC_C_PORTFOLIO.ImportBatch">
+  <Annotation Term="UI.HeaderInfo">
+    <Record Type="UI.HeaderInfo">
+      <PropertyValue Property="TypeName" String="Import Batch"/>
+      <PropertyValue Property="TypeNamePlural" String="Import Batches"/>
+      <PropertyValue Property="Title">
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="BatchID"/>
+        </Record>
+      </PropertyValue>
+    </Record>
+  </Annotation>
+
+  <Annotation Term="UI.SelectionFields">
+    <Collection>
+      <PropertyPath>BatchID</PropertyPath>
+      <PropertyPath>EvidenceProvenance</PropertyPath>
+    </Collection>
+  </Annotation>
+
+  <!-- Fixes the empty skeleton table -->
+  <Annotation Term="UI.LineItem">
+    <Collection>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="BatchID"/>
+        <PropertyValue Property="Label" String="Batch ID"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="EvidenceProvenance"/>
+        <PropertyValue Property="Label" String="Provenance"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsInserted"/>
+        <PropertyValue Property="Label" String="Inserted"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsUpdated"/>
+        <PropertyValue Property="Label" String="Updated"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsRejected"/>
+        <PropertyValue Property="Label" String="Rejected"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="CreatedAt"/>
+        <PropertyValue Property="Label" String="Import Date"/>
+      </Record>
+    </Collection>
+  </Annotation>
+</Annotations>
     </Schema>
   </edmx:DataServices>
 </edmx:Edmx>

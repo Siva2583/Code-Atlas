@@ -1,0 +1,29 @@
+[
+  {
+    "ObjectID": "Z_ORD_CALC",
+    "ObjectName": "Z_ORDER_CALCULATION",
+    "ObjectType": "PROG",
+    "PackageName": "Z_FIN_CORE",
+    "RiskScore": 85,
+    "RecommendedStrategy": "Redevelop via RAP",
+    "DecisionStatus": "Pending Review"
+  },
+  {
+    "ObjectID": "Z_INV_EXIT",
+    "ObjectName": "Z_INVOICE_USEREXIT",
+    "ObjectType": "CLAS",
+    "PackageName": "Z_SD_MODS",
+    "RiskScore": 92,
+    "RecommendedStrategy": "Replace with BAdI",
+    "DecisionStatus": "Approved"
+  },
+  {
+    "ObjectID": "Z_CUST_REP",
+    "ObjectName": "Z_CUSTOMER_REPORT",
+    "ObjectType": "PROG",
+    "PackageName": "Z_SALES",
+    "RiskScore": 30,
+    "RecommendedStrategy": "Retire / Out of Scope",
+    "DecisionStatus": "Pending Review"
+  }
+]

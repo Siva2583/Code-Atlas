@@ -1,0 +1,240 @@
+{
+  "_version": "1.89.0",
+  "sap.app": {
+    "id": "portfoliooverview",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "resources": "resources.json",
+    "sourceTemplate": {
+      "id": "@sap/generator-fiori:lrop",
+      "version": "1.33.0",
+      "toolsId": "365659e5-4ddc-43f1-b68f-cfccd3db7ee4"
+    },
+    "dataSources": {
+      "annotation": {
+        "type": "ODataAnnotation",
+        "uri": "annotations/annotation.xml",
+        "settings": {
+          "localUri": "annotations/annotation.xml"
+        }
+      },
+      "mainService": {
+        "uri": "/here/goes/your/serviceurl/",
+        "type": "OData",
+        "settings": {
+          "annotations": [
+            "annotation"
+          ],
+          "localUri": "localService/mainService/metadata.xml",
+          "odataVersion": "4.0"
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.153.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "portfoliooverview.i18n.i18n"
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      },
+      "@i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "uri": "i18n/i18n.properties"
+      }
+    },
+    "resources": {
+      "css": []
+    },
+    "routing": {
+      "config": {},
+      "routes": [
+        {
+          "name": "PortfolioItemsList",
+          "pattern": ":?query:",
+          "target": "PortfolioItemsList"
+        },
+        {
+          "name": "PortfolioItemsObjectPage",
+          "pattern": "PortfolioItems({key}):?query:",
+          "target": "PortfolioItemsObjectPage"
+        },
+        {
+          "name": "CustomObjectsList",
+          "pattern": "inventory:?query:",
+          "target": "CustomObjectsList"
+        },
+        {
+          "name": "CustomObjectsDetail",
+          "pattern": "CustomObjects({key}):?query:",
+          "target": "CustomObjectsDetail"
+        },
+        {
+          "name": "RulesAdmin",
+          "pattern": "rules:?query:",
+          "target": "RulesAdmin"
+        },
+        {
+          "name": "ImportCenter",
+          "pattern": "import:?query:",
+          "target": "ImportCenter"
+        }
+      ],
+      "targets": {
+        "PortfolioItemsList": {
+          "type": "Component",
+          "id": "PortfolioItemsList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/PortfolioItems",
+              "entitySet": "PortfolioItems",
+              "initialLoad": "Enabled",
+              "navigation": {
+                "PortfolioItems": {
+                  "detail": {
+                    "route": "PortfolioItemsObjectPage"
+                  }
+                }
+              },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "PortfolioItemsObjectPage": {
+          "type": "Component",
+          "id": "PortfolioItemsObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "editableHeaderContent": false,
+              "contextPath": "/PortfolioItems",
+              "entitySet": "PortfolioItems"
+            }
+          }
+        },
+        "CustomObjectsList": {
+          "type": "Component",
+          "id": "CustomObjectsList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/CustomObjects",
+              "entitySet": "CustomObjects",
+              "initialLoad": "Enabled",
+              "navigation": {
+                "CustomObjects": {
+                  "detail": {
+                    "route": "CustomObjectsDetail"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "CustomObjectsDetail": {
+          "type": "Component",
+          "id": "CustomObjectsDetail",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "contextPath": "/CustomObjects",
+              "entitySet": "CustomObjects",
+              "initialLoad": "Enabled"
+            }
+          }
+        },
+        "RulesAdmin": {
+          "type": "Component",
+          "id": "RulesAdmin",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/Rules",
+              "entitySet": "Rules",
+              "initialLoad": "Enabled"
+            }
+          }
+        },
+        "ImportCenter": {
+          "type": "Component",
+          "id": "ImportCenter",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/ImportBatches",
+              "entitySet": "ImportBatches",
+              "initialLoad": "Enabled",
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "ResponsiveTable"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "sap.fiori": {
+    "registrationIds": [],
+    "archeType": "transactional"
+  },
+  "sap.fe": {
+    "app": {
+      "enableLazyLoading": true
+    }
+  }
+}

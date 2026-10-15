@@ -40,8 +40,8 @@ server:
         services:
           - urlPath: /here/goes/your/serviceurl
             metadataPath: ./webapp/localService/mainService/metadata.xml
-            mockdataPath: ./webapp/localService/mainService/data
-            generateMockData: true
+            mockdataPath: ./webapp/localService/mockdata
+            generateMockData: false
         annotations: []
 builder:
   resources:
