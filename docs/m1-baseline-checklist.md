@@ -45,3 +45,31 @@ Repository inventory and exact original headers are recorded. Activation, persis
 ## Follow-up environment information (2026-10-14)
 
 The user reports having ADT access. The supplied service-binding metadata suggests an SAP BTP ABAP Environment trial (system ID TRL, region AP21); this has not been independently connected or verified in ADT. The exact ABAP release, development package, software component, UUID API availability, activation results, ABAP Unit support, transport IDs and import route remain unknown. See docs/feasibility-note.md for the capability checklist. No credentials are recorded here.
+
+
+## Task 1 recheck after fast-forwarding main (2026-10-14)
+
+Branch is now at the same commit as main: a6c7460fae13a72af548a28be1b647aee4db8fa9.
+
+### Current GitHub file sizes
+
+| Area | Current sizes |
+|---|---|
+| Table serialization files | 7 files, all 0 bytes |
+| CDS data-view files | 6 files, all 0 bytes |
+| Importer ABAP source files | 9 files, all 0 bytes |
+| Import ABAP Unit test placeholders | 3 files, all 0 bytes |
+| data/templates/objects.csv | 120 bytes |
+| data/templates/usage.csv | 116 bytes |
+| data/templates/findings.csv | 100 bytes |
+| data/templates/dependencies.csv | 81 bytes |
+
+The sizes are from the current GitHub tree, not a local working-tree listing.
+
+### Current header check
+
+**Pass for header names and order** against the candidate v0.2 contract. All four templates have the expected fields in the expected order. The contract's Markdown table inserts spaces after commas for readability; the actual CSV headers do not. Candidate v0.2 remains NOT FROZEN pending team approval.
+
+### BTP_DEV access check
+
+This Codex session has no open VS Code or ADT window, so I cannot verify whether Member 1 can see the BTP_DEV destination or its System Library. M3's feasibility note reports the destination as BTP_DEV, but Member 1's access remains unverified. Table/CDS activation, class activation and ABAP Unit remain NOT RUN. M3 owns docs/feasibility-note.md; send these results to M3 rather than editing that note.
