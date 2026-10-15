@@ -38,6 +38,6 @@ Record what was observed while connecting VS Code to the assigned SAP BTP ABAP E
 ## 4. Sign-Off Checklist
 
 - [x] Member 3 — Workflow engine (`zccmc_cl_decision_workflow`), RAP artifacts (`src/zccmc_rap/`), 24 ABAP Unit tests (`zccmc_ut_decision_workflow`), and offline oracle (`tools/m3_workflow_oracle.py`) delivered; environment blockers explicitly recorded.
-- [ ] Member 1 — Confirm `ObjectUUID` physical type once ADT package is provisioned.
+- [x] Member 1 — Persistence tables (`src/zccmc_data/*.tabl.xml` using `SYSUUID_X16` for `ObjectUUID`), CDS views (`zccmc_i_*.ddls.asddls`), importer classes (`src/zccmc_import/*`), 32 ABAP Unit tests (`zccmc_ut_import_*`), and offline oracle (`tools/m1_import_oracle.py`) delivered; live ADT activation gated on `F-02` non-`$TMP` package.
 - [ ] Member 2 — Confirm `docs/m3-contract-review.md` resolutions for C6, C7, C9, C13, C14.
 - [ ] Member 4 — Consume `docs/state-transitions.md` v0.3 status/action/error vocabulary in Fiori Elements metadata.

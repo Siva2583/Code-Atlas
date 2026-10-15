@@ -7,12 +7,12 @@
 ## 1. Environment and Package Blockers
 
 - **VS Code Trial Package Limitation (`BLOCKED`):** While VS Code successfully connects to the SAP BTP ABAP Environment trial (`Code-Atlas-TRL`) and reads system OData V2/V4 catalogs, only `Local Objects ($TMP)` is visible and the VS Code object creation palette does not expose a `Package` generator. Project policy prohibits creating shared deliverables in `$TMP`.
-- **No Fabricated Activation Claims:** Because a transportable package (`ZCCMC`) and Member 1's base tables (`src/zccmc_data/*`, currently 0 bytes) are not yet activated in the trial tenant, none of the RAP DDL, BDEF, Behavior Pool, DCL, or Service Binding objects under `src/zccmc_rap/` are claimed as activated in SAP. They are delivered as complete, reviewable abapGit source proposals.
+- **No Fabricated Activation Claims:** Because a transportable package (`ZCCMC`) is not yet provisioned in the trial tenant (`F-02`), Member 1's persistence tables and CDS views (`src/zccmc_data/*`) and Member 3's RAP artifacts (`src/zccmc_rap/*`) are not yet activated in SAP, none of the RAP DDL, BDEF, Behavior Pool, DCL, or Service Binding objects under `src/zccmc_rap/` are claimed as activated in SAP. They are delivered as complete, reviewable abapGit source proposals.
 
 ## 2. Import Entry Path Limitation (`M3-D04-T01`)
 
 - **Interactive Browser CSV Upload (`BLOCKED`):** Direct browser CSV file upload through RAP/Fiori Elements is not verified in the trial environment and is therefore marked **BLOCKED**.
-- **Supported Fallback:** Data ingestion uses repeatable synthetic fixture loading and offline validation (`tools/validate_import_fixtures.py`), while `src/zccmc_rap/` provides the read projections for batch status (`ZCCMC_C_ImportBatch`) and row-level errors (`ZCCMC_C_ImportRowError`). The UI must not render an active file-upload control that claims live backend ingestion.
+- **Supported Fallback:** Data ingestion uses Member 1's repeatable synthetic importer (`src/zccmc_import/*`) and offline verification oracles (`tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py`), while `src/zccmc_rap/` provides the read projections for batch status (`ZCCMC_C_ImportBatch`) and row-level errors (`ZCCMC_C_ImportRowError`). The UI must not render an active file-upload control that claims live backend ingestion.
 
 ## 3. Identity, Role Mapping, and Separation of Duties (`M3-D06-T01` / `M3-D10-T01`)
 

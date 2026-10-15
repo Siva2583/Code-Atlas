@@ -1,48 +1,66 @@
-# Member 1 Runbook — CSV Import and Verification
+# Clean Core Migration Cockpit — Team Runbook (Member 1 & Member 3)
 
-**Status:** repository-side instructions and candidate behavior only. No SAP activation, upload API or measured importer path is currently verified.
+**Status:** Repository implementation, unit test suites, and offline verification oracles are complete (`M1-D01-T01` .. `M1-D11-T01` and `M3-D01-T01` .. `M3-D11-T01`). Live SAP BTP ABAP Environment activation remains gated on provisioning a transportable non-`$TMP` development package (`ZCCMC`; see `docs/feasibility-note.md` F-02 and `docs/limitations.md`).
 
-## Before loading data
+---
 
-1. Confirm the assigned ABAP environment, release and package in ADT. Record the value and transport/request identifiers in docs/m1-baseline-checklist.md.
-2. Confirm in ADT that the signed contract's source-system, object, usage, finding, dependency, batch and row-result/error entities activate. Use the target's released UUID APIs and exact physical field lengths; do not silently truncate CSV fields.
-3. Confirm ABAP Unit, CDS reads, supported import entry path, request size and staged-row CRUD if considered. Record observed results. A web upload or service is not available by assumption.
-4. Obtain M2–M4 approval for docs/data-contract.md candidate v0.2. If findings_as_of or another schema decision changes, update the templates, fixtures and tests together before implementation.
-5. Provision the synthetic source system DEMO_SYS using the tenant-approved process.
+## Member 1 Runbook — Persistence, CSV Import & Provenance Verification (`M1-D01-T01` .. `M1-D11-T01`)
 
-## Offline fixture check
+### 1. Offline Import, Edge-Case, Scale & Reproducibility Oracle Check
 
-From the repository root run:
+From the repository root, run:
 
-    python tools/validate_import_fixtures.py
+```bash
+python3 tools/validate_import_fixtures.py
+python3 tools/m1_import_oracle.py --report docs/m1-golden-import-results.md
+```
 
-This checks template headers, CSV shape, base references, edge fixtures and 1k/10k fixture row counts. It reports local standard-library CSV read time only. It does not execute ABAP code or measure SAP import performance.
+These commands execute and verify:
+- **Template & Fixture Integrity (`validate_import_fixtures.py`)**: Confirms that all 4 templates in `data/templates/`, the 4 baseline files in `data/sample-synthetic/`, all 6 edge-case files in `data/sample-synthetic/edge-cases/`, and the `1,000`-row and `10,000`-row performance fixtures in `data/sample-synthetic/perf/` match the frozen v0.3 contract.
+- **32 Unit-Test Scenarios (`IMP-V01..V12`, `IMP-I01..I10`, `IMP-E01..E10`)**: Cross-checks every test scenario implemented in `zccmc_ut_import_validator`, `zccmc_ut_import_idempotency`, and `zccmc_ut_import_edge_cases` (RFC 4180 quotes/commas, BOM, CRLF, header drift, leap-year calendar dates, enum normalization, intra-file `DUPLICATE_KEY` rejection, `UNKNOWN_SOURCE_SYSTEM`, `UNKNOWN_OBJECT`, reverse-order no-replay, partial-batch commit, and `PERSISTENCE_FAILURE` atomic rollback).
+- **200 Random Row-Order Permutations**: Shuffles row ordering across `objects.csv`, `usage.csv`, `findings.csv`, and `dependencies.csv` 200 times and verifies identical persisted state and SHA-256 row digests.
+- **1,000-Row & 10,000-Row Scale & Idempotency Benchmarks (`M1-D08-T01`)**: Runs initial insert (`1,000` and `10,000` `INSERTED`) and immediate repeat import (`1,000` and `10,000` `UNCHANGED`, zero duplicates, zero truncation).
+- **Day-10 Clean Reset & Reproducibility (`M1-D10-T01`)**: Runs two consecutive clean resets (`reset_synthetic_store`) followed by the 4-file baseline load (`objects` -> `usage` -> `findings` -> `dependencies`), repeat load (`UNCHANGED`), and corrected batch (`objects_corrected_batch.csv` -> `1 UPDATED`, preserving `ObjectUUID` and append-only batch provenance).
 
-## Tenant import sequence
+### 2. ADT Activation & ABAP Unit Sequence (Once Non-`$TMP` Package `ZCCMC` Is Provisioned)
 
-1. Start from a clean synthetic-only tenant/package. Never use customer evidence for these fixtures.
-2. Load objects.csv first, then usage.csv, findings.csv and dependencies.csv. Each file is a distinct import batch.
-3. Confirm each batch's parsed, accepted and rejected counts reconcile; inspect row-level errors and accepted-row provenance.
-4. Repeat the same files. Business rows should report UNCHANGED while each new attempt retains its own batch ID and row results.
-5. Run the edge fixtures one at a time and compare results with docs/import-design.md and docs/test-matrix.md.
-6. Run the 1,000-row and 10,000-row object fixtures through the same activated parser/loader. Record tenant/release, package, user, start/end time, input bytes/rows, accepted/rejected counts, repeat-import counts and elapsed time. Do not claim an SLA; no target has been approved.
-7. Reset only through the approved synthetic test cleanup procedure. Do not delete prior provenance as part of corrected-batch testing.
+1. Provision a transportable development package (`ZCCMC`) in the assigned SAP BTP ABAP Environment tenant and import the repository via abapGit (`.abapgit.xml` maps `/src/` with `PREFIX` folder logic).
+2. Activate Member 1's 8 DDIC database tables (`src/zccmc_data/*.tabl.xml`) in order:
+   - `zccmc_sourcesys.tabl.xml` (`ZCCMC_SOURCESYS`)
+   - `zccmc_custobj.tabl.xml` (`ZCCMC_CUSTOBJ`)
+   - `zccmc_usage.tabl.xml` (`ZCCMC_USAGE`)
+   - `zccmc_finding.tabl.xml` (`ZCCMC_FINDING`)
+   - `zccmc_depend.tabl.xml` (`ZCCMC_DEPEND`)
+   - `zccmc_impbatch.tabl.xml` (`ZCCMC_IMPBATCH`)
+   - `zccmc_improwerr.tabl.xml` (`ZCCMC_IMPROWERR`)
+   - `zccmc_improwres.tabl.xml` (`ZCCMC_IMPROWRES`)
+3. Activate Member 1's 8 CDS interface views (`src/zccmc_data/zccmc_i_*.ddls.asddls`):
+   - `zccmc_i_sourcesystem`, `zccmc_i_importrowerror`, `zccmc_i_importrowresult`, `zccmc_i_importbatch`
+   - `zccmc_i_usagefact`, `zccmc_i_finding`, `zccmc_i_dependency`, `zccmc_i_customobject`
+4. Activate Member 1's importer interface and classes (`src/zccmc_import/*`):
+   - `zccmc_if_source_adapter.intf.abap`
+   - `zccmc_cl_csv_adapter.clas.abap`
+   - `zccmc_cl_import_validator.clas.abap`
+   - `zccmc_cl_import_batch_mgr.clas.abap`
+   - `zccmc_cl_import_object_loader.clas.abap`, `zccmc_cl_import_usage_loader.clas.abap`, `zccmc_cl_import_finding_loader.clas.abap`, `zccmc_cl_import_dep_loader.clas.abap`
+   - `zccmc_cl_import_orchestrator.clas.abap`
+5. Activate and run Member 1's 3 ABAP Unit test classes (`Ctrl+Shift+F10` in ADT):
+   - `src/zccmc_test/zccmc_ut_import_validator.clas.abap` (12 test methods)
+   - `src/zccmc_test/zccmc_ut_import_idempotency.clas.abap` (10 test methods)
+   - `src/zccmc_test/zccmc_ut_import_edge_cases.clas.abap` (10 test methods)
+6. Record transport request IDs and ADT execution screenshots in `docs/m1-day1-day11-status.md`.
 
-## Current release record
+---
 
-- ABAP environment/release: awaiting tenant details.
-- Import route and request-size limit: unverified.
-- ADT package and transport: unverified.
-- Table/CDS activation and ABAP Unit result: not supplied.
-- SAP 1k/10k import timings: not measured.
-- Open blocker: source objects and all import classes/tests in the repository were empty at baseline.
+## Member 2 Runbook — Rules Engine & Portfolio Analytics Verification (`M2-D01-T01` .. `M2-D11-T01`)
 
-## Follow-up release record
+From the repository root, run:
 
-- Environment: likely SAP BTP ABAP Environment trial, inferred from user-supplied service-binding metadata; system TRL / AP21.
-- ADT access: user reports access; no ADT connection has been observed here.
-- Exact ABAP release, package, software component, UUID API, activation, ABAP Unit and import path: unknown or unverified. Fill these from docs/feasibility-note.md before activating implementation objects.
-- Candidate contract v0.2 remains pending shared approval; do not implement against it as a frozen contract until M2–M4 confirm the keys, enums, result/error codes, corrections and partial-file policy.
+```bash
+python3 tools/m2_rules_oracle.py --report docs/m2-golden-results.md
+```
+
+In ADT (once package `ZCCMC` is provisioned), run ABAP Unit (`Ctrl+Shift+F10`) on `ZCCMC_UT_RULE_ENGINE` (27 test methods) and `ZCCMC_UT_PORTFOLIO_ANALYTICS` (8 test methods).
 
 ---
 
@@ -57,7 +75,7 @@ python3 tools/m3_workflow_oracle.py --report docs/m3-golden-workflow-results.md
 ```
 
 This executes:
-- All **352 combinations** of the `8Statuses x 11 Actions x 4 Roles` transition matrix (asserting the 27 allowed paths and 325 rejected paths).
+- All **352 combinations** of the `8 Statuses x 11 Actions x 4 Roles` transition matrix (asserting the 27 allowed paths and 325 rejected paths).
 - All **24 unit-test scenarios** (`WF-T01` through `WF-T24`), verifying Separation of Duties (`ERR_SOD_VIOLATION`), mandatory reason length (`>= 10` chars), strategy validation (`ERR_OVERRIDE_SAME_STRATEGY`), optimistic concurrency (`ERR_STALE_CONCURRENCY_CONFLICT`), one-active-decision uniqueness (`ERR_DUPLICATE_ACTIVE_DECISION`), and append-only audit immutability (`ERR_AUDIT_IMMUTABLE`).
 - The **Day-10 portfolio rehearsal** across the 7 synthetic sample objects in `data/sample-synthetic/objects.csv` using synthetic test principals (`DEMO_DEV_1`, `DEMO_DEV_2`, `DEMO_REV_1`, `DEMO_ADMIN_1`, `DEMO_AUDITOR_1`).
 
@@ -75,4 +93,3 @@ This executes:
    - `zccmc_c_decision.bdef.asbdef`
    - `zccmc_ui_cockpit_o4.srvd.srvdsrv` and publish `zccmc_ui_cockpit_o4.srvb.xml` (OData V4 - UI).
 5. Record the transport request IDs, service binding URL, and ADT test screenshots in `docs/feasibility-note.md` and `docs/m3-day1-day11-status.md`.
-

@@ -53,61 +53,61 @@ ABAP Unit class: `src/zccmc_test/zccmc_ut_portfolio_analytics.clas.abap` testing
 
 ---
 
-# Test Matrix — Member 1 import scope through Day 8
+---
 
-**Status:** expected behaviors below are the Member 1 candidate oracle in docs/data-contract.md. Only offline fixture structure is runnable from a normal checkout. ABAP Unit and SAP import results must be recorded from the assigned ADT tenant; they are not inferred from a CSV parse.
+# Test Matrix — Member 1 Persistence, CSV Import & Provenance (`M1-D01-T01` .. `M1-D11-T01`)
 
-## Day 1–2: baseline and contract
+**Status:** All 32 unit-test scenarios (`IMP-V01..V12`, `IMP-I01..I10`, `IMP-E01..E10`), 6 edge-case fixtures, 200 row-order permutations, 1k/10k scale runs, and Day-10 clean reset reproducibility are implemented in `src/zccmc_test/zccmc_ut_import_*.clas.abap` and **PASSED** via `tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py` (recorded in `docs/m1-golden-import-results.md`). Live SAP ADT execution awaits non-`$TMP` package provisioning (`docs/feasibility-note.md` F-02).
 
-| ID | Scenario | Expected result | Evidence / state |
-|---|---|---|---|
-| M1-D01-01 | Compare each of four original template headers with v0.1 contract. | Exact ordered match. | Verified against branch head 3006fb0. |
-| M1-D01-02 | Inspect table, view, importer and ABAP Unit contents. | Record fields, keys, activation and entry point. | Files are 0 bytes; SAP activation/access result pending. |
-| M1-D02-01 | Compare candidate v0.2 headers with all templates. | Exact ordered match including objects.findings_as_of. | Run tools/validate_import_fixtures.py after checkout; shared sign-off pending. |
-| M1-D02-02 | Verify every named edge fixture has an explicit result. | See M1-D04-01 through M1-D04-06. | Candidate result codes are in docs/import-design.md. |
+## 1. CSV Parser & Validator Suite (`src/zccmc_test/zccmc_ut_import_validator.clas.abap`)
 
-Determinism: run all tests twice and with shuffled input order. Only
-RecommendationRunID and RunTimestamp may differ.
+| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
+|---|---|---|---|---|---|
+| `IMP-V01` | Parse and validate all 4 template headers (`objects`, `usage`, `findings`, `dependencies`) | Exact ordered match against contract v0.3 | `data/templates/*.csv` | `t01_four_template_headers_pass` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V02` | Header mismatch (missing `findings_as_of` or wrong column order) | File rejected with `HEADER_MISMATCH` | In-code header fixture | `t02_header_mismatch_rejected` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V03` | Header-only file (`objects_empty.csv`) | File rejected with `EMPTY_FILE`, `0` valid rows | `edge-cases/objects_empty.csv` | `t03_empty_file_rejected` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V04` | RFC 4180 quoted field with comma and escaped quotes (`""`) | Parsed as 1 field: `DEMO quoted, comma and "quote" fixture` | `edge-cases/findings_quoted_fields.csv` | `t04_rfc4180_quotes_and_commas` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V05` | Leading UTF-8 BOM (`U+FEFF`) and `CRLF` record endings | BOM stripped, records parsed without header drift | In-code BOM + CRLF fixture | `t05_utf8_bom_and_crlf_handled` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V06` | Unclosed quote or unescaped quote mid-field | Parse fails with `MALFORMED_CSV` and 1-based record number | In-code malformed CSV | `t06_malformed_csv_unclosed_q` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V07` | Data row with too few or too many columns | Row rejected with `COLUMN_COUNT_MISMATCH` | In-code 6-col dependency row | `t07_column_count_mismatch` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V08` | Intra-file duplicate business key (`objects_duplicate_keys.csv`) | **Both** rows (`record 2` & `3`) rejected with `DUPLICATE_KEY` | `edge-cases/objects_duplicate_keys.csv` | `t08_duplicate_keys_both_reject` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V09` | Calendar date validation (`2026-02-30`, `2026-02-29` vs. leap `2024-02-29`) | Non-calendar dates rejected with `INVALID_DATE` naming field | `edge-cases/usage_malformed_date.csv` | `t09_malformed_and_calendar_dt` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V10` | Enum & blank rules (blank `criticality` -> `UNKNOWN`; blank `severity` -> error) | Blank `criticality` = `UNKNOWN`; bad enum = `INVALID_ENUM`; blank `severity` = `MISSING_REQUIRED_FIELD` | In-code enum fixtures | `t10_enum_and_criticality_rules` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V11` | Integer & negative `run_count` validation | `< 0` -> `NEGATIVE_RUN_COUNT`; decimal/alpha -> `INVALID_INTEGER` | In-code usage fixtures | `t11_integer_and_neg_run_count` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-V12` | Key trimming and uppercase normalization | Keys & enums uppercased; free-text `description`/`message` case preserved | In-code mixed-case row | `t12_key_normalization_trimming` | Oracle passed. ABAP Unit written, pending ADT run. |
+
+## 2. Idempotency, Corrections, Provenance & Cross-Team Integration Suite (`src/zccmc_test/zccmc_ut_import_idempotency.clas.abap`)
+
+| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
+|---|---|---|---|---|---|
+| `IMP-I01` | Clean 4-file baseline import in frozen order (`objects` -> `usage` -> `findings` -> `dependencies`) | `COMMITTED`: `7` objects, `6` usages, `8` findings, `2` dependencies `INSERTED`; `0` errors | `data/sample-synthetic/*.csv` | `t01_clean_four_file_baseline` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I02` | Immediate repeat import of all 4 baseline files | `COMMITTED`: `7`, `6`, `8`, `2` `UNCHANGED`; `0` duplicates; `ObjectUUID`s preserved; new `BatchUUID`s recorded | `data/sample-synthetic/*.csv` | `t02_repeat_import_unchanged` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I03` | Corrected object batch (`objects_corrected_batch.csv`) | `COMMITTED`: `1 UPDATED` (`ZSD_OPEN_ORDERS_RPT` description updated in place), `ObjectUUID` preserved, total objects = `7` | `edge-cases/objects_corrected_batch.csv` | `t03_corrected_batch_in_place` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I04` | Replay baseline `objects.csv` after corrected batch | `COMMITTED`: `1 UPDATED` (reverted) + `6 UNCHANGED` = `7` accepted | `data/sample-synthetic/objects.csv` | `t04_replay_baseline_after_corr` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I05` | Dependent entity (`usage`) upsert idempotency | Modified `run_count` on existing usage key yields `1 UPDATED`, total usages = `6` | In-code usage update | `t05_dependent_upsert_semantics` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I06` | Day-10 clean reset (`reset_synthetic_store`) and two consecutive clean runs | Both runs produce identical counts (`7`, `6`, `8`, `2`), business keys, and `row_sha256` digests | `data/sample-synthetic/*.csv` | `t06_clean_reset_reproducible` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I07` | Input row-order permutation across all 4 files (200 random shuffles in oracle) | Identical persisted entity state and `row_sha256` digests | Permuted `sample-synthetic/*.csv` | `t07_row_order_permutation_det` | Oracle passed (200/200). ABAP Unit written, pending ADT run. |
+| `IMP-I08` | M1 -> M2 bridge (`build_m2_evidence_for_object` -> `zccmc_cl_rule_engine=>evaluate`) | Evaluates persisted M1 data to exact M2 golden outcomes (`6 MANUAL_REVIEW`, `1 KEEP_ADAPT`) | `data/sample-synthetic/*.csv` | `t08_m1_to_m2_evidence_bridge` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I09` | M1 -> M3 `ObjectUUID` foreign-key stability across re-imports | `ObjectUUID` linked by M3 `ZCCMC_DECISION` remains unchanged after M1 repeat and corrected imports | `objects.csv` + `objects_corrected_batch.csv` | `t09_m1_to_m3_uuid_stability` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-I10` | Append-only provenance ledger (`batches`, `row_results`, `row_errors`) | Prior batches and row results remain intact after subsequent imports | Multi-batch sequence | `t10_append_only_provenance` | Oracle passed. ABAP Unit written, pending ADT run. |
+
+## 3. Edge Cases, Reference Ordering, Rollback & Scale Suite (`src/zccmc_test/zccmc_ut_import_edge_cases.clas.abap`)
+
+| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
+|---|---|---|---|---|---|
+| `IMP-E01` | Import `objects_empty.csv` into orchestrator | Batch `FAILED` with `EMPTY_FILE`; `0` objects written | `edge-cases/objects_empty.csv` | `t01_edge_objects_empty` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E02` | Import `objects_duplicate_keys.csv` into orchestrator | Batch `FAILED`; `parsed = 2`, `accepted = 0`, `rejected = 2` (`DUPLICATE_KEY` on both rows) | `edge-cases/objects_duplicate_keys.csv` | `t02_edge_objects_duplicate_keys` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E03` | Import `usage_malformed_date.csv` after baseline objects | Batch `FAILED`; `1 REJECTED` with `INVALID_DATE` on `period_start` (`2026-02-30`) | `edge-cases/usage_malformed_date.csv` | `t03_edge_usage_malformed_date` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E04` | Import `findings_unknown_object.csv` after baseline objects | Batch `FAILED`; `1 REJECTED` with `UNKNOWN_OBJECT` on `object_name`; zero orphan findings | `edge-cases/findings_unknown_object.csv` | `t04_edge_findings_unknown_obj` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E05` | Import `findings_quoted_fields.csv` after baseline objects | Batch `COMMITTED`; `1 INSERTED` with comma and escaped quotes preserved | `edge-cases/findings_quoted_fields.csv` | `t05_edge_findings_quoted_fields` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E06` | Reverse-order import (`usage`, `findings`, `dependencies` before `objects`) | All dependent rows rejected with `UNKNOWN_OBJECT`; loading `objects` later does **not** silently replay them | `data/sample-synthetic/*.csv` (reversed) | `t06_reverse_order_no_replay` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E07` | Partial-batch commit (1 valid row + 1 invalid row in same file) | Batch `COMMITTED` (`accepted = 1`, `rejected = 1`); valid row persisted, invalid row recorded in `row_errors` | In-code mixed batch | `t07_partial_batch_valid_invalid` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E08` | Unprovisioned `source_system` on object row | Row rejected with `UNKNOWN_SOURCE_SYSTEM`; zero objects created | In-code `UNPROVISIONED_SYS` | `t08_unknown_source_system_rej` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E09` | Fatal persistence failure (`simulate_persistence_failure = abap_true`) | File business writes rolled back atomically; batch `FAILED` with `PERSISTENCE_FAILURE`; no half-batch remains | Fault-injected object batch | `t09_fatal_persistence_rollback` | Oracle passed. ABAP Unit written, pending ADT run. |
+| `IMP-E10` | Bulk scale (`1,000` and `10,000` rows) & repeat-import idempotency | `1,000` and `10,000` rows `INSERTED` on pass 1 and `UNCHANGED` on pass 2; zero truncation or duplicate keys | `perf/objects_1000.csv`, `perf/objects_10000.csv` | `t10_scale_bulk_and_repeat` | Oracle passed (`docs/m1-golden-import-results.md`). ABAP Unit written, pending ADT run. |
 
 ---
 
-# Test Matrix — Member 1 import scope through Day 8
+# Test Matrix — Member 3 Workflow, Authorization, SoD & Audit (`M3-D01-T01` .. `M3-D11-T01`)
 
-**Status:** expected behaviors below are the Member 1 candidate oracle in docs/data-contract.md. Only offline fixture structure is runnable from a normal checkout. ABAP Unit and SAP import results must be recorded from the assigned ADT tenant; they are not inferred from a CSV parse.
-
-## Day 1–2: baseline and contract
-
-| ID | Scenario | Expected result | Evidence / state |
-|---|---|---|---|
-| M1-D01-01 | Compare each of four original template headers with v0.1 contract. | Exact ordered match. | Verified against branch head 3006fb0. |
-| M1-D01-02 | Inspect table, view, importer and ABAP Unit contents. | Record fields, keys, activation and entry point. | Files are 0 bytes; SAP activation/access result pending. |
-| M1-D02-01 | Compare candidate v0.2 headers with all templates. | Exact ordered match including objects.findings_as_of. | Run tools/validate_import_fixtures.py after checkout; shared sign-off pending. |
-| M1-D02-02 | Verify every named edge fixture has an explicit result. | See M1-D04-01 through M1-D04-06. | Candidate result codes are in docs/import-design.md. |
-
-## Day 3–6: persistence and loader behavior
-
-| ID | Scenario | Expected result | State |
-|---|---|---|---|
-| M1-D03-01 | Activate each agreed table and CDS; insert/read one synthetic row per entity. | All activate and fields/keys match the signed contract. | Not run; empty repository source and tenant evidence required. |
-| M1-D04-01 | Parse four template headers, RFC 4180 quotes, escaped quotes, BOM and line endings. | Correct typed fields, no header drift or data loss. | Fixture coverage prepared; ABAP parser/Unit test absent. |
-| M1-D04-02 | Header-only objects_empty.csv. | File-level EMPTY_FILE, zero business writes. | Fixture prepared; SAP loader not run. |
-| M1-D04-03 | Two rows with one repeated object key. | Both REJECTED / DUPLICATE_KEY, neither applied. | Fixture prepared; SAP loader not run. |
-| M1-D04-04 | usage_malformed_date.csv. | Row REJECTED / INVALID_DATE naming the field. | Fixture prepared; SAP loader not run. |
-| M1-D04-05 | findings_unknown_object.csv. | Row REJECTED / UNKNOWN_OBJECT. | Fixture prepared; SAP loader not run. |
-| M1-D04-06 | Quoted comma and escaped quote in finding message. | One accepted parse; message preserved exactly. | Fixture prepared; ABAP parser not run. |
-| M1-D05-01 | Import a valid object file twice. | First INSERTED; repeat UNCHANGED, new batch/provenance retained. | Importer and ABAP Unit absent. |
-| M1-D05-02 | Re-import objects_corrected_batch.csv. | Same key is UPDATED; prior batch evidence remains. | Fixture prepared; persistence not run. |
-| M1-D06-01 | Malformed, unknown, duplicate, empty and corrected batches. | Counts reconcile; accepted and rejected rows retain provenance; previous batches remain. | Data model and importer not implemented/activated. |
-
-## Day 7–8: integration and scale
-
-| ID | Scenario | Expected result | Evidence / state |
-|---|---|---|---|
-| M1-D07-01 | Import objects, usage, findings, dependencies in order. | All in-scope references resolve; counts reconcile. | Needs SAP importer. |
-| M1-D07-02 | Import dependent files before objects, then load objects. | Dependents are rejected UNKNOWN_OBJECT and are not silently replayed; object state reflects only committed rows. | Candidate policy; needs SAP importer. |
-| M1-D07-03 | Inject fatal persistence failure. | Current file's business writes roll back; batch is FAILED; no half-persisted file. | Needs tenant fault-injection method; not run. |
-| M1-D08-01 | Parse 1,000-row and 10,000-row fixtures locally. | Exactly 1,000 / 10,000 unique rows; 101,121 / 1,010,121 bytes; offline parse 0.0036s / 0.0378s. | Passed with Python 3.12.14 on the Windows workspace, 2026-10-14. Python csv.reader only; not an ABAP/SAP performance result. |
-| M1-D08-02 | Repeat a performance file. | No duplicate business keys; importer reports UNCHANGED and retains another batch's provenance. | Needs SAP importer. |
-| M1-D08-03 | Re-run all edge files through the activated importer. | Outcomes match M1-D04; accepted + rejected equals parsed for every file. | Not run; tenant and implementation required. |
-
-Rules determinism, RAP authorization/stale-update and Fiori empty/error/filter tests remain owned by Members 2, 3 and 4 respectively. This matrix does not mark their tests passed.
+ABAP Unit class: `src/zccmc_test/zccmc_ut_decision_workflow.clas.abap` (`t01`..`t24`, `WF-T01`..`WF-T24`) testing `src/zccmc_rap/zccmc_cl_decision_workflow.clas.abap`. All 24 unit tests and 352 transition matrix combinations passed in `tools/m3_workflow_oracle.py` (see `docs/m3-golden-workflow-results.md` and `docs/m3-day1-day11-status.md`).
