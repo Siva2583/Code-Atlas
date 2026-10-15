@@ -1,0 +1,54 @@
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: {
+  typeName: 'Custom Object',
+  typeNamePlural: 'Custom Objects',
+  title: { type: #STANDARD, value: 'ObjectName' },
+  description: { value: 'ObjectType' }
+}
+annotate view ZCCMC_C_CUSTOMOBJECT with {
+
+  /* --- PAGE 2: FILTER BAR & LIST REPORT TABLE --- */
+  
+  @UI.facet: [
+    { id: 'ObjectHeader', purpose: #HEADER, type: #DATAPOINT_REFERENCE, targetQualifier: 'RiskScore' },
+    { id: 'ObjectHeaderStatus', purpose: #HEADER, type: #DATAPOINT_REFERENCE, targetQualifier: 'DecisionStatus' },
+    
+    /* --- PAGE 3: OBJECT PAGE TABS & SECTIONS --- */
+    { id: 'GeneralInfo', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Object Summary', position: 10 },
+    { id: 'FindingsTab', purpose: #STANDARD, type: #LINEITEM_REFERENCE, label: 'Findings', position: 20, targetElement: '_Findings' },
+    { id: 'AuditTab', purpose: #STANDARD, type: #LINEITEM_REFERENCE, label: 'Audit Timeline', position: 30, targetElement: '_AuditTrail' }
+  ]
+
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  @UI.selectionField: [{ position: 10 }]
+  @UI.identification: [{ position: 10 }]
+  ObjectName;
+
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  @UI.selectionField: [{ position: 20 }]
+  @UI.identification: [{ position: 20 }]
+  ObjectType;
+
+  @UI.lineItem: [{ position: 30 }]
+  @UI.selectionField: [{ position: 30 }]
+  PackageName;
+
+  @UI.lineItem: [{ position: 40, criticality: 'RiskCriticality' }]
+  @UI.dataPoint: { qualifier: 'RiskScore', title: 'Risk Score' }
+  @UI.selectionField: [{ position: 40 }]
+  RiskScore;
+
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  @UI.identification: [{ position: 50 }]
+  RecommendedStrategy;
+
+  @UI.lineItem: [
+    { position: 60, importance: #HIGH },
+    // Page 3 Reviewer Actions: Approve, Override
+    { type: #FOR_ACTION, dataAction: 'approveDecision', label: 'Approve' },
+    { type: #FOR_ACTION, dataAction: 'overrideDecision', label: 'Override' }
+  ]
+  @UI.dataPoint: { qualifier: 'DecisionStatus', title: 'Status' }
+  @UI.selectionField: [{ position: 50 }]
+  DecisionStatus;
+}

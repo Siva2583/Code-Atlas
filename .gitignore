@@ -1,9 +1,27 @@
 .vscode/
 .idea/
-*.log
-*.tmp
+
+# Operating system files
 .DS_Store
 Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Node.js and SAP UI5 build artifacts
 node_modules/
+dist/
+coverage/
+.nyc_output/
+.npm/
+*.tsbuildinfo
+
+# Local environment configuration (keep templates shareable)
 .env
+.env.*
+!.env.example
+!.env.template
+
+# Local credentials
 *.secret

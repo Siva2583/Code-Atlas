@@ -134,19 +134,19 @@ Planned content: rule outcomes, evaluation order, rule-set versioning, risk scor
 
 > **Owner: Member 3 — RAP Workflow & Security.**
 
-The Migration Decision workflow routes custom-code modernization recommendations from Member 2's rules engine through human governance review with strict role-based access control, separation of duties (SoD), optimistic concurrency protection, and an append-only audit trail.
+The Migration Decision workflow is responsible for routing custom-code modernization recommendations through human review and recording the resulting decisions.
 
-### Delivered Architecture & Artifacts (`src/zccmc_rap/` & `src/zccmc_test/`)
+The proposed workflow covers:
 
-* **Pure ABAP Workflow & Security Engine (`zccmc_cl_decision_workflow.clas.abap`):** Decoupled, deterministic state machine enforcing all 8 workflow statuses (`PROPOSED`, `IN_REVIEW`, `APPROVED`, `OVERRIDDEN`, `RETURNED`, `IN_PROGRESS`, `BLOCKED`, `MIGRATED`), 11 lifecycle actions (`SUBMIT`, `RESUBMIT`, `APPROVE`, `OVERRIDE`, `RETURN`, `START`, `BLOCK`, `UNBLOCK`, `MARK_MIGRATED`, `REOPEN`, plus `ASSIGN_OWNER`), and 15 stable error codes (`ERR_SOD_VIOLATION`, `ERR_UNAUTHORIZED_ROLE`, `ERR_INVALID_TRANSITION`, `ERR_STALE_CONCURRENCY_CONFLICT`, `ERR_AUDIT_IMMUTABLE`, etc.).
-* **Separation of Duties (SoD) & Role Governance:** Enforces `DEVELOPER`, `REVIEWER`, `ADMIN`, and read-only `AUDITOR` permissions on the server. When SoD is enabled (default), `OwnerUser`, `CreatedBy`, and `SubmittedBy` are blocked from approving or overriding their own decision—even if the principal holds both `DEVELOPER` and `REVIEWER` roles.
-* **Proposed RAP Business Object & OData V4 Service (`src/zccmc_rap/`):** Includes `ZCCMC_DECISION` / `ZCCMC_DECAUDIT` table definitions, `ZCCMC_I_Decision` / `ZCCMC_I_DecisionAudit` CDS view entities, managed behavior definition (`zccmc_i_decision.bdef.asbdef` with `etag master ChangedAt` and append-only audit composition), projection views (`ZCCMC_C_Decision`, `ZCCMC_C_DecisionAudit`, `ZCCMC_C_CustomObject`, `ZCCMC_C_ImportBatch`, `ZCCMC_C_ImportRowError`), DCL access control (`zccmc_dcl_decision.dcls.asdcls`), and OData V4 service definition/binding (`zccmc_ui_cockpit_o4`).
-* **ABAP Unit Suite & Offline Oracle (`zccmc_ut_decision_workflow.clas.abap` & `tools/m3_workflow_oracle.py`):** 24 unit-test scenarios (`WF-T01`..`WF-T24`) and an exhaustive 352-combination (`8 states x 11 actions x 4 roles`) verification runner, plus Day-10 rehearsal across the 7 synthetic sample objects.
+* **Decision lifecycle:** `PROPOSED`, `IN_REVIEW`, `APPROVED`, `OVERRIDDEN`, `RETURNED`, `IN_PROGRESS`, `BLOCKED`, and `MIGRATED`.
+* **Role-based permissions:** Developer, Reviewer, Admin, and proposed read-only Auditor permissions.
+* **Separation of duties:** the backend must prevent users from approving or overriding decisions they prepared or own when separation of duties is enabled.
+* **Audit history:** successful workflow changes should record the authenticated actor, timestamp, previous and new values, and applicable reason.
+* **Concurrency:** stale updates must not silently overwrite a newer decision.
 
-### Verification Status & References
+The workflow contract, allowed transitions, validation requirements, audit fields, and required negative tests are documented in [`docs/state-transitions.md`](docs/state-transitions.md).
 
-* **Contract & Golden Results:** [`docs/state-transitions.md`](docs/state-transitions.md) (v0.3), [`docs/m3-contract-review.md`](docs/m3-contract-review.md), [`docs/m3-golden-workflow-results.md`](docs/m3-golden-workflow-results.md), and [`docs/m3-day1-day11-status.md`](docs/m3-day1-day11-status.md).
-* **Environment Blockers:** Offline oracle passes 100% (`352/352` matrix combinations and `24/24` unit tests). Live SAP BTP ABAP Environment activation, OData service publication, and interactive CSV upload remain marked **BLOCKED** pending non-`$TMP` package provisioning in the VS Code trial workspace. See [`docs/feasibility-note.md`](docs/feasibility-note.md) and [`docs/limitations.md`](docs/limitations.md).
+**Implementation status:** The workflow remains a proposed design pending team agreement. RAP business-object activation, backend authorization, audit persistence, stale-update protection, and project service exposure have not yet been verified in the assigned SAP environment. See [`docs/feasibility-note.md`](docs/feasibility-note.md) and [`docs/limitations.md`](docs/limitations.md) for current verification status.
 
 ---
 
