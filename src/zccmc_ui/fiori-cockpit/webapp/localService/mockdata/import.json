@@ -1,0 +1,18 @@
+[
+  {
+    "BatchID": "BATCH-2026-001",
+    "EvidenceProvenance": "SOURCE-SYSTEM EXPORT",
+    "RecordsInserted": 1250,
+    "RecordsUpdated": 42,
+    "RecordsRejected": 0,
+    "CreatedAt": "2026-10-10"
+  },
+  {
+    "BatchID": "BATCH-2026-002",
+    "EvidenceProvenance": "SYNTHETIC DEMO DATA",
+    "RecordsInserted": 150,
+    "RecordsUpdated": 0,
+    "RecordsRejected": 3,
+    "CreatedAt": "2026-10-14"
+  }
+]

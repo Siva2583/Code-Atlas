@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+    <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+  </edmx:Reference>
+
+  <edmx:DataServices>
+    <Schema Namespace="ZCCMC_C_RULE" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      
+      <EntityType Name="Rule">
+        <Key>
+          <PropertyRef Name="RuleUUID"/>
+        </Key>
+        <Property Name="RuleUUID" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="RuleID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+        <Property Name="RulePriority" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="TargetOutcome" Type="Edm.String" Nullable="false" MaxLength="40"/>
+        <Property Name="ConditionSummary" Type="Edm.String" MaxLength="250"/>
+        <Property Name="RuleVersion" Type="Edm.String" MaxLength="20"/>
+        <Property Name="IsActive" Type="Edm.Boolean"/>
+        <Property Name="StatusCriticality" Type="Edm.Int32"/>
+      </EntityType>
+
+      <Action Name="simulateRule" IsBound="true">
+        <Parameter Name="bindingParameter" Type="ZCCMC_C_RULE.Rule" Nullable="false"/>
+      </Action>
+      <Action Name="publishRule" IsBound="true">
+        <Parameter Name="bindingParameter" Type="ZCCMC_C_RULE.Rule" Nullable="false"/>
+      </Action>
+
+      <EntityContainer Name="Service">
+        <EntitySet Name="Rules" EntityType="ZCCMC_C_RULE.Rule"/>
+      </EntityContainer>
+
+      <Annotations Target="ZCCMC_C_RULE.Rule">
+        
+        <Annotation Term="UI.HeaderInfo">
+          <Record Type="UI.HeaderInfo">
+            <PropertyValue Property="TypeName" String="Decision Rule"/>
+            <PropertyValue Property="TypeNamePlural" String="Rules Administration"/>
+            <PropertyValue Property="Title">
+              <Record Type="UI.DataField">
+                <PropertyValue Property="Value" Path="RuleID"/>
+              </Record>
+            </PropertyValue>
+          </Record>
+        </Annotation>
+
+        <!-- Search / Filter Bar -->
+        <Annotation Term="UI.SelectionFields">
+          <Collection>
+            <PropertyPath>TargetOutcome</PropertyPath>
+            <PropertyPath>IsActive</PropertyPath>
+          </Collection>
+        </Annotation>
+
+        <!-- Table Columns & Bound Actions -->
+        <Annotation Term="UI.LineItem">
+          <Collection>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="RulePriority"/>
+              <PropertyValue Property="Label" String="Priority"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="RuleID"/>
+              <PropertyValue Property="Label" String="Rule Identifier"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="TargetOutcome"/>
+              <PropertyValue Property="Label" String="Target Strategy"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="ConditionSummary"/>
+              <PropertyValue Property="Label" String="Condition Summary"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="RuleVersion"/>
+              <PropertyValue Property="Label" String="Version"/>
+            </Record>
+            <Record Type="UI.DataField">
+              <PropertyValue Property="Value" Path="IsActive"/>
+              <PropertyValue Property="Label" String="Active"/>
+              <PropertyValue Property="Criticality" Path="StatusCriticality"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="ZCCMC_C_RULE.simulateRule"/>
+              <PropertyValue Property="Label" String="What-If Simulation"/>
+            </Record>
+            <Record Type="UI.DataFieldForAction">
+              <PropertyValue Property="Action" String="ZCCMC_C_RULE.publishRule"/>
+              <PropertyValue Property="Label" String="Publish"/>
+            </Record>
+          </Collection>
+        </Annotation>
+
+      </Annotations>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>

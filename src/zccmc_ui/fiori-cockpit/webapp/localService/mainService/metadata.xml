@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+    <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+        <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+    </edmx:Reference>
+    <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/Analytics.xml">
+        <edmx:Include Namespace="com.sap.vocabularies.Analytics.v1" Alias="Analytics"/>
+    </edmx:Reference>
+    <edmx:DataServices>
+        <Schema Namespace="ZCCMC_C_PORTFOLIO" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+            <EntityType Name="PortfolioItem">
+                <Key>
+                    <PropertyRef Name="ObjectUUID"/>
+                </Key>
+                <Property Name="ObjectUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="ObjectName" Type="Edm.String" Nullable="false" MaxLength="120"/>
+                <Property Name="ObjectType" Type="Edm.String" Nullable="false" MaxLength="10"/>
+                <Property Name="PackageName" Type="Edm.String" MaxLength="120"/>
+                <Property Name="RecommendedStrategy" Type="Edm.String" MaxLength="40"/>
+                <Property Name="RiskCategory" Type="Edm.String" MaxLength="20"/>
+                <Property Name="DecisionStatus" Type="Edm.String" MaxLength="30"/>
+                <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
+                <Property Name="SourceSystemID" Type="Edm.String" MaxLength="40"/>
+                <Property Name="Description" Type="Edm.String" MaxLength="500"/>
+                <Property Name="BusinessOwner" Type="Edm.String" MaxLength="120"/>
+                <Property Name="FirstSeen" Type="Edm.Date"/>
+                <Property Name="LastSeen" Type="Edm.Date"/>
+                <Property Name="EvidenceAsOf" Type="Edm.Date"/>
+                <Property Name="TotalCount" Type="Edm.Int32"/>
+            </EntityType>
+            <EntityType Name="ImportBatch">
+                <Key>
+                    <PropertyRef Name="BatchID"/>
+                </Key>
+                <Property Name="BatchID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="EvidenceProvenance" Type="Edm.String" MaxLength="80"/>
+                <Property Name="RecordsInserted" Type="Edm.Int32"/>
+                <Property Name="RecordsUpdated" Type="Edm.Int32"/>
+                <Property Name="RecordsRejected" Type="Edm.Int32"/>
+                <Property Name="CreatedAt" Type="Edm.Date"/>
+            </EntityType>
+            <EntityType Name="CustomObject">
+                <Key>
+                    <PropertyRef Name="ObjectID"/>
+                </Key>
+                <Property Name="ObjectID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="SourceSystemID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="ObjectName" Type="Edm.String" Nullable="false" MaxLength="120"/>
+                <Property Name="ObjectType" Type="Edm.String" Nullable="false" MaxLength="10"/>
+                <Property Name="PackageName" Type="Edm.String" MaxLength="120"/>
+                <Property Name="Description" Type="Edm.String" MaxLength="500"/>
+                <Property Name="BusinessOwner" Type="Edm.String" MaxLength="120"/>
+                <Property Name="Criticality" Type="Edm.String" MaxLength="10"/>
+                <Property Name="FirstSeen" Type="Edm.Date"/>
+                <Property Name="LastSeen" Type="Edm.Date"/>
+                <Property Name="RiskScore" Type="Edm.Int32"/>
+                <Property Name="RiskCriticality" Type="Edm.Int32"/>
+                <Property Name="RecommendedStrategy" Type="Edm.String" MaxLength="40"/>
+                <Property Name="DecisionStatus" Type="Edm.String" MaxLength="30"/>
+                <Property Name="EvidenceAsOf" Type="Edm.Date"/>
+            </EntityType>
+            <EntityType Name="Rule">
+                <Key>
+                    <PropertyRef Name="RuleUUID"/>
+                </Key>
+                <Property Name="RuleUUID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="RuleID" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="RulePriority" Type="Edm.Int32" Nullable="false"/>
+                <Property Name="TargetOutcome" Type="Edm.String" Nullable="false" MaxLength="40"/>
+                <Property Name="ConditionSummary" Type="Edm.String" MaxLength="250"/>
+                <Property Name="RuleVersion" Type="Edm.String" MaxLength="20"/>
+                <Property Name="IsActive" Type="Edm.Boolean"/>
+                <Property Name="StatusCriticality" Type="Edm.Int32"/>
+            </EntityType>
+            <Action Name="simulateRule" IsBound="true">
+                <Parameter Name="bindingParameter" Type="ZCCMC_C_PORTFOLIO.Rule" Nullable="false"/>
+            </Action>
+            <Action Name="publishRule" IsBound="true">
+                <Parameter Name="bindingParameter" Type="ZCCMC_C_PORTFOLIO.Rule" Nullable="false"/>
+            </Action>
+            <EntityContainer Name="Service">
+                <EntitySet Name="PortfolioItems" EntityType="ZCCMC_C_PORTFOLIO.PortfolioItem"/>
+                <EntitySet Name="ImportBatches" EntityType="ZCCMC_C_PORTFOLIO.ImportBatch"/>
+                <EntitySet Name="CustomObjects" EntityType="ZCCMC_C_PORTFOLIO.CustomObject"/>
+                <EntitySet Name="Rules" EntityType="ZCCMC_C_PORTFOLIO.Rule"/>
+                <EntitySet Name="import" EntityType="ZCCMC_C_PORTFOLIO.ImportBatch"/>
+                <EntitySet Name="inventory" EntityType="ZCCMC_C_PORTFOLIO.CustomObject"/>
+                <EntitySet Name="rules" EntityType="ZCCMC_C_PORTFOLIO.Rule"/>
+            </EntityContainer>
+            <Annotations Target="ZCCMC_C_PORTFOLIO.PortfolioItem">
+                <!-- Top Filters -->
+                <Annotation Term="UI.SelectionFields">
+                    <Collection>
+                        <PropertyPath>RecommendedStrategy</PropertyPath>
+                        <PropertyPath>RiskCategory</PropertyPath>
+                        <PropertyPath>DecisionStatus</PropertyPath>
+                        <PropertyPath>ObjectType</PropertyPath>
+                        <PropertyPath>PackageName</PropertyPath>
+                    </Collection>
+                </Annotation>
+                <!-- KPI Tag / Header Metric -->
+                <Annotation Term="UI.HeaderInfo">
+                    <Record Type="UI.HeaderInfoType">
+                        <PropertyValue Property="TypeName" String="Portfolio Item"/>
+                        <PropertyValue Property="TypeNamePlural" String="Portfolio Items"/>
+                        <PropertyValue Property="Title">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectName"/>
+                            </Record>
+                        </PropertyValue>
+                        <PropertyValue Property="Description">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectType"/>
+                            </Record>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <!-- Chart 1: Proposed Strategy Distribution (Donut) -->
+                <Annotation Term="UI.Chart" Qualifier="StrategyDistribution">
+                    <Record Type="UI.ChartDefinitionType">
+                        <PropertyValue Property="Title" String="Objects by Strategy"/>
+                        <PropertyValue Property="ChartType" EnumMember="UI.ChartType/Donut"/>
+                        <PropertyValue Property="Dimensions">
+                            <Collection>
+                                <PropertyPath>RecommendedStrategy</PropertyPath>
+                            </Collection>
+                        </PropertyValue>
+                        <PropertyValue Property="Measures">
+                            <Collection>
+                                <PropertyPath>TotalCount</PropertyPath>
+                            </Collection>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <!-- Chart 2: Risk Profile Distribution (Bar/Column) -->
+                <Annotation Term="UI.Chart" Qualifier="RiskDistribution">
+                    <Record Type="UI.ChartDefinitionType">
+                        <PropertyValue Property="Title" String="Risk Profile"/>
+                        <PropertyValue Property="ChartType" EnumMember="UI.ChartType/Column"/>
+                        <PropertyValue Property="Dimensions">
+                            <Collection>
+                                <PropertyPath>RiskCategory</PropertyPath>
+                            </Collection>
+                        </PropertyValue>
+                        <PropertyValue Property="Measures">
+                            <Collection>
+                                <PropertyPath>TotalCount</PropertyPath>
+                            </Collection>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <!-- Detail Table Underneath Charts -->
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectName"/>
+                            <PropertyValue Property="Label" String="Object Name"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectType"/>
+                            <PropertyValue Property="Label" String="Type"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="PackageName"/>
+                            <PropertyValue Property="Label" String="Package"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+                            <PropertyValue Property="Label" String="Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RiskCategory"/>
+                            <PropertyValue Property="Label" String="Risk Level"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="DecisionStatus"/>
+                            <PropertyValue Property="Label" String="Decision Status"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Identification">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="SourceSystemID"/>
+                            <PropertyValue Property="Label" String="Source System"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectType"/>
+                            <PropertyValue Property="Label" String="Object Type"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="PackageName"/>
+                            <PropertyValue Property="Label" String="Package"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Description"/>
+                            <PropertyValue Property="Label" String="Description"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="Criticality"/>
+                            <PropertyValue Property="Label" String="Business Criticality"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+                            <PropertyValue Property="Label" String="Recommended Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RiskCategory"/>
+                            <PropertyValue Property="Label" String="Risk Level"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="DecisionStatus"/>
+                            <PropertyValue Property="Label" String="Decision Status"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="BusinessOwner"/>
+                            <PropertyValue Property="Label" String="Business Owner"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="FirstSeen"/>
+                            <PropertyValue Property="Label" String="First Seen"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="LastSeen"/>
+                            <PropertyValue Property="Label" String="Last Seen"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="EvidenceAsOf"/>
+                            <PropertyValue Property="Label" String="Evidence As Of"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.Facets">
+                    <Collection>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="ObjectSummary"/>
+                            <PropertyValue Property="Label" String="Object Summary"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.Identification"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+            </Annotations>
+<Annotations Target="ZCCMC_C_PORTFOLIO.ImportBatch">
+  <Annotation Term="UI.HeaderInfo">
+    <Record Type="UI.HeaderInfoType">
+      <PropertyValue Property="TypeName" String="Import Batch"/>
+      <PropertyValue Property="TypeNamePlural" String="Import Batches"/>
+      <PropertyValue Property="Title">
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="BatchID"/>
+        </Record>
+      </PropertyValue>
+    </Record>
+  </Annotation>
+
+  <Annotation Term="UI.SelectionFields">
+    <Collection>
+      <PropertyPath>BatchID</PropertyPath>
+      <PropertyPath>EvidenceProvenance</PropertyPath>
+    </Collection>
+  </Annotation>
+  <Annotation Term="UI.LineItem">
+    <Collection>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="BatchID"/>
+        <PropertyValue Property="Label" String="Batch ID"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="EvidenceProvenance"/>
+        <PropertyValue Property="Label" String="Provenance"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsInserted"/>
+        <PropertyValue Property="Label" String="Inserted"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsUpdated"/>
+        <PropertyValue Property="Label" String="Updated"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="RecordsRejected"/>
+        <PropertyValue Property="Label" String="Rejected"/>
+      </Record>
+      <Record Type="UI.DataField">
+        <PropertyValue Property="Value" Path="CreatedAt"/>
+        <PropertyValue Property="Label" String="Import Date"/>
+      </Record>
+    </Collection>
+  </Annotation>
+</Annotations>
+            <Annotations Target="ZCCMC_C_PORTFOLIO.CustomObject">
+                <Annotation Term="UI.HeaderInfo">
+                    <Record Type="UI.HeaderInfoType">
+                        <PropertyValue Property="TypeName" String="Custom Object"/>
+                        <PropertyValue Property="TypeNamePlural" String="Custom Objects"/>
+                        <PropertyValue Property="Title">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="ObjectName"/>
+                            </Record>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <Annotation Term="UI.SelectionFields">
+                    <Collection>
+                        <PropertyPath>ObjectName</PropertyPath>
+                        <PropertyPath>ObjectType</PropertyPath>
+                        <PropertyPath>PackageName</PropertyPath>
+                        <PropertyPath>RiskScore</PropertyPath>
+                        <PropertyPath>RecommendedStrategy</PropertyPath>
+                        <PropertyPath>DecisionStatus</PropertyPath>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectName"/>
+                            <PropertyValue Property="Label" String="Object Name"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ObjectType"/>
+                            <PropertyValue Property="Label" String="Object Type"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="PackageName"/>
+                            <PropertyValue Property="Label" String="Package"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RiskScore"/>
+                            <PropertyValue Property="Label" String="Risk Score"/>
+                            <PropertyValue Property="Criticality" Path="RiskCriticality"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+                            <PropertyValue Property="Label" String="Recommended Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="DecisionStatus"/>
+                            <PropertyValue Property="Label" String="Status"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+                    <!-- Sections on the Object Page -->
+<Annotation Term="UI.Facets">
+  <Collection>
+    <Record Type="UI.ReferenceFacet">
+      <PropertyValue Property="Label" String="General Information"/>
+      <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#GeneralInfo"/>
+    </Record>
+    <Record Type="UI.ReferenceFacet">
+      <PropertyValue Property="Label" String="Migration Assessment"/>
+      <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#AssessmentInfo"/>
+    </Record>
+  </Collection>
+</Annotation>
+
+<!-- Section 1 Fields -->
+<Annotation Term="UI.FieldGroup" Qualifier="GeneralInfo">
+  <Record>
+    <PropertyValue Property="Data">
+      <Collection>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="ObjectID"/>
+          <PropertyValue Property="Label" String="Object ID"/>
+        </Record>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="ObjectName"/>
+          <PropertyValue Property="Label" String="Object Name"/>
+        </Record>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="ObjectType"/>
+          <PropertyValue Property="Label" String="Type"/>
+        </Record>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="PackageName"/>
+          <PropertyValue Property="Label" String="Package"/>
+        </Record>
+      </Collection>
+    </PropertyValue>
+  </Record>
+</Annotation>
+
+<!-- Section 2 Fields -->
+<Annotation Term="UI.FieldGroup" Qualifier="AssessmentInfo">
+  <Record>
+    <PropertyValue Property="Data">
+      <Collection>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="RecommendedStrategy"/>
+          <PropertyValue Property="Label" String="Recommended Strategy"/>
+        </Record>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="RiskScore"/>
+          <PropertyValue Property="Label" String="Risk Score"/>
+        </Record>
+        <Record Type="UI.DataField">
+          <PropertyValue Property="Value" Path="DecisionStatus"/>
+          <PropertyValue Property="Label" String="Status"/>
+        </Record>
+      </Collection>
+    </PropertyValue>
+  </Record>
+</Annotation>
+            </Annotations>
+            <Annotations Target="ZCCMC_C_PORTFOLIO.Rule">
+                <Annotation Term="UI.HeaderInfo">
+                    <Record Type="UI.HeaderInfoType">
+                        <PropertyValue Property="TypeName" String="Decision Rule"/>
+                        <PropertyValue Property="TypeNamePlural" String="Rules Administration"/>
+                        <PropertyValue Property="Title">
+                            <Record Type="UI.DataField">
+                                <PropertyValue Property="Value" Path="RuleID"/>
+                            </Record>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <Annotation Term="UI.SelectionFields">
+                    <Collection>
+                        <PropertyPath>TargetOutcome</PropertyPath>
+                        <PropertyPath>IsActive</PropertyPath>
+                    </Collection>
+                </Annotation>
+                <Annotation Term="UI.LineItem">
+                    <Collection>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RulePriority"/>
+                            <PropertyValue Property="Label" String="Priority"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RuleID"/>
+                            <PropertyValue Property="Label" String="Rule Identifier"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="TargetOutcome"/>
+                            <PropertyValue Property="Label" String="Target Strategy"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="ConditionSummary"/>
+                            <PropertyValue Property="Label" String="Condition Summary"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="RuleVersion"/>
+                            <PropertyValue Property="Label" String="Version"/>
+                        </Record>
+                        <Record Type="UI.DataField">
+                            <PropertyValue Property="Value" Path="IsActive"/>
+                            <PropertyValue Property="Label" String="Active"/>
+                            <PropertyValue Property="Criticality" Path="StatusCriticality"/>
+                        </Record>
+                        <Record Type="UI.DataFieldForAction">
+                            <PropertyValue Property="Action" String="ZCCMC_C_PORTFOLIO.simulateRule"/>
+                            <PropertyValue Property="Label" String="What-If Simulation"/>
+                        </Record>
+                        <Record Type="UI.DataFieldForAction">
+                            <PropertyValue Property="Action" String="ZCCMC_C_PORTFOLIO.publishRule"/>
+                            <PropertyValue Property="Label" String="Publish"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+            </Annotations>
+        </Schema>
+    </edmx:DataServices>
+</edmx:Edmx>

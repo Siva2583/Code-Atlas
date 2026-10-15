@@ -1,0 +1,28 @@
+{
+  "generationParameters": {
+    "generationDate": "Wed Oct 14 2026 19:25:35 GMT+0530 (India Standard Time)",
+    "generatorPlatform": "Visual Studio Code",
+    "serviceType": "File",
+    "metadataFilename": "rules_metadata.xml",
+    "serviceUrl": "/here/goes/your/serviceurl/",
+    "appName": "rules-admin",
+    "appTitle": "Clean Core Rules Administration",
+    "appDescription": "Classification & Recommendation Engine Cockpit",
+    "appNamespace": "",
+    "ui5Theme": "sap_horizon",
+    "ui5Version": "1.153.0",
+    "enableEslint": true,
+    "enableTypeScript": true,
+    "showMockDataInfo": true,
+    "generatorVersion": "1.33.0",
+    "template": "List Report Page V4",
+    "generatorName": "SAP Fiori Application Generator",
+    "entityRelatedConfig": [
+      {
+        "type": "Main Entity",
+        "value": "Rules"
+      }
+    ],
+    "launchText": "To launch the generated application, run the following from the generated application root folder:\n\n```\n    npm start\n```"
+  }
+}
