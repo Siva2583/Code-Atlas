@@ -73,3 +73,17 @@ The sizes are from the current GitHub tree, not a local working-tree listing.
 ### BTP_DEV access check
 
 This Codex session has no open VS Code or ADT window, so I cannot verify whether Member 1 can see the BTP_DEV destination or its System Library. M3's feasibility note reports the destination as BTP_DEV, but Member 1's access remains unverified. Table/CDS activation, class activation and ABAP Unit remain NOT RUN. M3 owns docs/feasibility-note.md; send these results to M3 rather than editing that note.
+
+---
+
+## Day 3–11 Repository Implementation Completion (2026-10-15)
+
+All zero-byte placeholders identified in the Day-1 baseline have been implemented in the repository and verified offline via `tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py`:
+
+| Area | Baseline State (Day 1) | Delivered Repository State (Day 11) | Verification Status |
+|---|---|---|---|
+| `.abapgit.xml` | 0 bytes | Populated (`STARTING_FOLDER = /src/`, `FOLDER_LOGIC = PREFIX`) | **VERIFIED (Repository)** |
+| Table definitions (`src/zccmc_data/*.tabl.xml`) | 7 files, 0 bytes | 8 valid abapGit `.tabl.xml` tables (`zccmc_sourcesys`, `zccmc_custobj`, `zccmc_usage`, `zccmc_finding`, `zccmc_depend`, `zccmc_impbatch`, `zccmc_improwerr`, `zccmc_improwres`) | **AUTHORED / BLOCKED on ADT Package `F-02`** |
+| CDS views (`src/zccmc_data/zccmc_i_*.ddls.asddls`) | 6 files, 0 bytes | 8 CDS interface view entities (`ZCCMC_I_SourceSystem`, `ZCCMC_I_CustomObject`, `ZCCMC_I_UsageFact`, `ZCCMC_I_Finding`, `ZCCMC_I_Dependency`, `ZCCMC_I_ImportBatch`, `ZCCMC_I_ImportRowError`, `ZCCMC_I_ImportRowResult`) aligned with M3's `ZCCMC_C_*` projections | **AUTHORED / BLOCKED on ADT Package `F-02`** |
+| Importer classes (`src/zccmc_import/*`) | 9 files, 0 bytes | 1 interface (`zccmc_if_source_adapter`) + 8 classes (`zccmc_cl_csv_adapter`, `zccmc_cl_import_validator`, `zccmc_cl_import_batch_mgr`, 4 entity loaders, `zccmc_cl_import_orchestrator`) + 9 `.xml` files | **VERIFIED (Offline Oracle)** |
+| Import ABAP Unit tests (`src/zccmc_test/zccmc_ut_import_*`) | 3 files, 0 bytes | 3 ABAP Unit test classes (`zccmc_ut_import_validator`, `zccmc_ut_import_idempotency`, `zccmc_ut_import_edge_cases`) with **32 test methods** (`IMP-V01..V12`, `IMP-I01..I10`, `IMP-E01..E10`) | **PASSED (32/32 in `tools/m1_import_oracle.py`)** |

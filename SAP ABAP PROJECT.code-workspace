@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "BTP_DEV",
+			"uri": "abap:/repotree-v1/BTP_DEV"
+		}
+	],
+	"settings": {}
+}

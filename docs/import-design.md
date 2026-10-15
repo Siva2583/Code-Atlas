@@ -1,47 +1,46 @@
-# Import Design — Member 1 candidate v0.2
+# Import Design — Member 1 (v0.3 — Architecture, Importer Classes & Provenance)
 
-**State:** design candidate based on the current Git branch and docs/data-contract.md. The four-file contract is awaiting M2–M4 sign-off. No file-upload, OData, staged-row CRUD or ABAP persistence capability has been proven in the assigned SAP tenant.
+**Owner:** Member 1 — Persistence and Import  
+**Version:** 0.3 (`M1-D02-T01` .. `M1-D11-T01`)  
+**State:** Repository implementation complete (`src/zccmc_data/*`, `src/zccmc_import/*`, `src/zccmc_test/zccmc_ut_import_*`) and verified offline via `tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py`. Live SAP ADT activation remains gated on non-`$TMP` package provisioning (`docs/feasibility-note.md` F-02).
 
-## Import boundary
+## 1. Module Architecture & Separation of Concerns
 
-The MVP has four inputs only: objects, usage, findings and dependencies. The importer accepts a complete byte stream for one file, identifies the file kind from the caller, computes its SHA-256, parses a header and data records, validates into typed rows, records row outcomes, then persists valid rows. It does not expose an upload endpoint until Day 1 proves a supported route. The CSV parser and validator should be pure ABAP services with no RAP/UI dependency.
+All CSV parsing, schema validation, batch tracking, and entity loading logic is implemented in pure, release-safe ABAP classes under `src/zccmc_import/` with zero dependency on RAP behavior pools or Fiori UI controllers:
 
-## Processing order and transaction policy
+| Artifact | Role | Key Methods |
+|---|---|---|
+| `zccmc_if_source_adapter.intf.abap` | Shared contract interface | Defines `c_file_kind`, `c_batch_status`, `c_row_result`, `c_error` (13 error codes), typed row/batch structures, and `parse_source`. |
+| `zccmc_cl_csv_adapter.clas.abap` | RFC 4180 CSV parser & digest service (`M1-D04-T01`) | `parse_csv_string`, `compute_digest` — strips UTF-8 BOM, handles LF/CRLF, parses quoted commas/newlines and escaped quotes (`""`), tracks 1-based CSV record numbers, and rejects malformed quoting (`MALFORMED_CSV`). |
+| `zccmc_cl_import_validator.clas.abap` | Persistence-independent validator (`M1-D04-T01`) | `get_expected_header`, `validate_header`, `is_valid_iso_date`, `parse_non_negative_int`, `validate_parsed_file` — checks headers, column counts, required fields, enums, leap-year calendar dates, and intra-file duplicate keys (`DUPLICATE_KEY`). |
+| `zccmc_cl_import_batch_mgr.clas.abap` | Append-only batch & provenance manager (`M1-D05-T01` / `M1-D06-T01`) | `create_batch`, `record_accepted_row`, `record_rejected_row`, `finalize_batch`, `fail_batch_file_level` — reconciles counts and appends immutable records to `batches`, `row_results`, and `row_errors`. |
+| `zccmc_cl_import_object_loader.clas.abap` | CustomObject loader (`M1-D05-T01`) | `load_objects` — checks `ZCCMC_SOURCESYS` (`UNKNOWN_SOURCE_SYSTEM`), upserts `ZCCMC_CUSTOBJ` by `source_system + object_type + object_name`, and preserves `ObjectUUID` on `UNCHANGED` / `UPDATED`. |
+| `zccmc_cl_import_usage_loader.clas.abap` | UsageFact loader (`M1-D05-T01`) | `load_usages` — verifies parent `ObjectUUID` (`UNKNOWN_OBJECT`), upserts `ZCCMC_USAGE` by composite usage key. |
+| `zccmc_cl_import_finding_loader.clas.abap` | Finding loader (`M1-D05-T01`) | `load_findings` — verifies parent `ObjectUUID` (`UNKNOWN_OBJECT`), upserts `ZCCMC_FINDING` by composite finding key. |
+| `zccmc_cl_import_dep_loader.clas.abap` | Dependency loader (`M1-D05-T01`) | `load_dependencies` — verifies both `FromObjectUUID` and `ToObjectUUID` (`UNKNOWN_OBJECT`), upserts `ZCCMC_DEPEND`. |
+| `zccmc_cl_import_orchestrator.clas.abap` | End-to-end orchestrator, rollback & M2/M3 bridge (`M1-D05..D10`) | `init_store`, `reset_synthetic_store`, `import_csv_file`, `import_four_file_set`, `build_m2_evidence_for_object`. |
 
-For a clean synthetic load, import objects first, followed by usage, findings and dependencies. The source system must already exist in tenant configuration. Dependent rows require the referenced object to have been committed; an unknown or not-yet-loaded object gets UNKNOWN_OBJECT. There is no deferred queue. A reverse-order run therefore records those row errors; importing objects later does not silently replay them.
+## 2. Reference Ordering, Partial-Batch Commit & Atomic File Rollback (`M1-D07-T01`)
 
-Each file has a distinct BatchUUID. Header/schema and row validations run before persistence. Valid rows from one file may be committed while invalid business rows receive persisted errors. A fatal database error rolls back all business writes from that file. The batch is COMMITTED when at least one row is INSERTED, UPDATED or UNCHANGED; it is FAILED when no data row succeeds, when the file is header-only, or when persistence fails. Counts must reconcile as described in the data contract.
+1. **Required Load Order**: For a clean load, import `objects.csv` first, followed by `usage.csv`, `findings.csv`, and `dependencies.csv`. The source system (`DEMO_SYS`) must be provisioned before object import.
+2. **No Deferred Replay**: Dependent rows (`usage`, `findings`, `dependencies`) require their referenced `CustomObject`(s) to exist at import time. If dependent files are imported before `objects.csv`, each row is rejected with `UNKNOWN_OBJECT` and persisted in `ZCCMC_IMPROWERR`. Loading `objects.csv` afterward does **not** silently replay previously failed batches; the caller must re-submit the dependent file in a new batch.
+3. **Partial-Batch Policy**: Within a single file, row-level validation or reference errors reject only the offending rows (`REJECTED`) while valid rows in the same file commit (`INSERTED` / `UPDATED` / `UNCHANGED`). If at least one row is accepted, the batch status is `COMMITTED`; if zero rows are accepted, the batch status is `FAILED`.
+4. **Atomic Rollback on Fatal Persistence Failure**: Before executing the entity loader for a file, `zccmc_cl_import_orchestrator=>import_csv_file` captures a transactional snapshot. If a fatal storage failure occurs (`PERSISTENCE_FAILURE`), all business-row writes for that file are rolled back completely so no undocumented half-batch remains.
 
-All colliding duplicate keys inside one file are rejected, including the first occurrence, so input order cannot choose a winner. Across files, business-key upsert produces INSERTED, UPDATED or UNCHANGED. Corrected batches do not delete missing rows or earlier provenance.
+## 3. Edge Fixtures & Verified Outcomes (`M1-D04-T01` .. `M1-D08-T01`)
 
-## Parsing and validation
-
-- Decode UTF-8, optionally removing one leading BOM. Accept LF or CRLF record endings.
-- Parse RFC 4180 quoted fields: commas and newlines inside quoted values are data; a quote inside a quoted value is escaped as two quotes.
-- Require the exact ordered header and exact number of columns. Ignore truly blank records; reject malformed quoted records and wrong-width records.
-- Trim key fields before comparison. Normalize object identity keys and enum tokens to uppercase. Preserve free-text fields.
-- Parse dates strictly as YYYY-MM-DD calendar dates and integers as non-negative base-10 values. Blank optional dates remain unknown. Do not turn unknown criticality into LOW.
-- Return row-level errors with stable codes from docs/data-contract.md. A valid but contradictory usage fact is retained so rules can report the specified conflict; it is not silently repaired by import.
-- Enforce file/row limits only after the tenant input and staging limits are measured. No SAP limit is asserted by this design.
-
-## Provenance and corrections
-
-Create a batch record for every attempt with file kind, digest, actor, UTC timestamp, status and reconciled counts. Record the source record number and business key for each result. Persist rejected-row details and retain accepted-row result provenance in an append-only ledger. Keep prior batch and row records after corrected re-import. Do not store or log live customer payloads in this synthetic demo workflow.
-
-An append-only import row/result ledger is still a proposed persistence object. If Day 1 does not prove that the required table/API can be activated, historical accepted-row provenance is not delivered; document the blocker instead of substituting a misleading “latest batch only” field.
-
-## Edge fixtures and expected behavior
-
-| Fixture | Expected import result |
+| Fixture | Expected & Verified Import Outcome |
 |---|---|
-| objects_empty.csv | Header parses; zero data records; batch fails with file-level EMPTY_FILE; no object is created or deleted. |
-| objects_duplicate_keys.csv | Both occurrences of the repeated composite key are REJECTED with DUPLICATE_KEY; neither is applied. |
-| objects_corrected_batch.csv | After the baseline objects import, the matching key updates mutable values and returns UPDATED; earlier batch/row provenance remains. |
-| usage_malformed_date.csv | The bad record is REJECTED with INVALID_DATE and names the bad date field; no part of that row is written. |
-| findings_unknown_object.csv | The record is REJECTED with UNKNOWN_OBJECT; no finding is created. |
-| findings_quoted_fields.csv | One valid finding parses with its comma and escaped quotes preserved exactly. |
-| repeated baseline file | Same normalized payload returns UNCHANGED; the attempt still has a new BatchUUID and row provenance. |
+| `edge-cases/objects_empty.csv` | Header parses; zero data records; batch `FAILED` with file-level `EMPTY_FILE`; zero objects created or deleted. |
+| `edge-cases/objects_duplicate_keys.csv` | Both rows (`source_record = 2` and `3`) of `DEMO_SYS\|PROG\|ZDEMO_DUPLICATE` are `REJECTED` with `DUPLICATE_KEY`; batch `FAILED`; neither row is applied. |
+| `edge-cases/objects_corrected_batch.csv` | After baseline `objects.csv`, updates `ZSD_OPEN_ORDERS_RPT` description in place (`1 UPDATED`), preserves `ObjectUUID`, leaves the other 6 objects untouched, and retains prior batch provenance. |
+| `edge-cases/usage_malformed_date.csv` | Record `2` (`2026-02-30`) is `REJECTED` with `INVALID_DATE` on `field_name = 'period_start'`; batch `FAILED`; zero usage writes. |
+| `edge-cases/findings_unknown_object.csv` | Record `2` (`ZUNKNOWN_IMPORT_TARGET`) is `REJECTED` with `UNKNOWN_OBJECT` on `field_name = 'object_name'`; batch `FAILED`; zero orphan findings. |
+| `edge-cases/findings_quoted_fields.csv` | Record `2` (`F900`) is `INSERTED` (`COMMITTED`) with comma and escaped quotes preserved verbatim (`DEMO quoted, comma and "quote" fixture`). |
+| Repeat of baseline 4 files | All rows return `UNCHANGED` (`7`, `6`, `8`, `2`); batches are `COMMITTED` with new `BatchUUID`s and append-only row-result provenance. |
 
-## Supported path and open gates
+## 4. Supported Import Entry Path & Environment Blocker (`M1-D01-T01` / `M3-D04-T01`)
 
-The repository currently has empty ABAP table, CDS, importer and test placeholders. Until ADT confirms release, package, released UUID APIs, activation, ABAP Unit and an import path, all names/physical field types remain proposals. Direct browser upload is not assumed. If staged-row CRUD is the only proven route, M1 and M4 must approve its exact capacity and lifecycle before adding the staging entity.
+Direct browser CSV file upload through RAP/Fiori Elements is **BLOCKED** in the shared trial environment (see `docs/feasibility-note.md` F-02 and F-21). The supported ingestion paths are:
+- **In SAP ADT (once package `ZCCMC` is provisioned)**: Repeatable ABAP Unit / orchestrator execution (`zccmc_cl_import_orchestrator=>import_four_file_set`) plus read-only OData exposure of `ZCCMC_C_ImportBatch` and `ZCCMC_C_ImportRowError`.
+- **Offline in Repository**: `python3 tools/m1_import_oracle.py --report docs/m1-golden-import-results.md` and `python3 tools/validate_import_fixtures.py`.

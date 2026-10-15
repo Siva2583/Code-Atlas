@@ -112,13 +112,16 @@ More detail, diagrams and page sketches: [`docs/architecture.md`](docs/architect
 
 ## 6. Data Model and Import
 
-> Owner: Member 1 — ABAP Data & Import.
+> **Owner: Member 1 — ABAP Data & Import (`src/zccmc_data/`, `src/zccmc_import/`, `src/zccmc_test/zccmc_ut_import_*`).**
 
-The MVP imports exactly four synthetic-data CSV kinds: objects, usage, findings and dependencies. The object identity is the normalized source system, object type and object name; ObjectUUID is the technical key generated in SAP. Usage, findings and dependency rows reference that identity.
+The persistence and import layer ingests the four synthetic-data CSV kinds (`objects`, `usage`, `findings`, `dependencies`), validates schema/types/dates/enums, rejects duplicate or orphan rows with stable error codes, and maintains an append-only batch and row-result provenance ledger:
 
-The four exact template headers, candidate field types, upsert keys, date/enum rules, batch statuses, row errors, order and provenance requirements are maintained in docs/data-contract.md and docs/import-design.md. Candidate v0.2 adds findings_as_of to the objects file so a complete findings scan with zero findings can be distinguished from unknown coverage. That change is awaiting shared contract review.
+* **Persistence schema (`src/zccmc_data/`):** 8 DDIC database tables (`ZCCMC_SOURCESYS`, `ZCCMC_CUSTOBJ`, `ZCCMC_USAGE`, `ZCCMC_FINDING`, `ZCCMC_DEPEND`, `ZCCMC_IMPBATCH`, `ZCCMC_IMPROWERR`, `ZCCMC_IMPROWRES`) and 8 CDS interface view entities (`ZCCMC_I_*`) aligned with Member 3's RAP projections and Member 4's Fiori Elements metadata.
+* **Pure ABAP importer (`src/zccmc_import/`):** `zccmc_if_source_adapter` (shared constants, types, 13 stable error codes), `zccmc_cl_csv_adapter` (RFC 4180 parser handling quotes, embedded commas, UTF-8 BOM, and LF/CRLF), `zccmc_cl_import_validator` (header, column width, required fields, enums, leap-year calendar dates, and intra-file `DUPLICATE_KEY` rejection), `zccmc_cl_import_batch_mgr` (append-only batch/row-result/row-error provenance), four idempotent entity loaders (`object`, `usage`, `finding`, `dep` preserving `ObjectUUID` on `UNCHANGED`/`UPDATED`), and `zccmc_cl_import_orchestrator` (reference-order orchestration, atomic file rollback on `PERSISTENCE_FAILURE`, reproducible Day-10 reset, and M1->M2 evidence bridge).
+* **Unit tests & offline oracle (`src/zccmc_test/` & `tools/`):** 32 ABAP Unit test methods across `zccmc_ut_import_validator` (12), `zccmc_ut_import_idempotency` (10), and `zccmc_ut_import_edge_cases` (10), cross-checked offline by `tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py` across all 6 edge fixtures, 200 row-order permutations, and 1,000 / 10,000-row performance & idempotency runs.
+* **Documentation & handoff records:** [`docs/data-contract.md`](docs/data-contract.md) (v0.3), [`docs/import-design.md`](docs/import-design.md) (v0.3), [`docs/er-diagram.md`](docs/er-diagram.md) (v0.3), [`docs/m1-contract-review.md`](docs/m1-contract-review.md), [`docs/m1-golden-import-results.md`](docs/m1-golden-import-results.md), and [`docs/m1-day1-day11-status.md`](docs/m1-day1-day11-status.md).
 
-All repository sample data is synthetic. The sample and edge/performance fixtures are test inputs, not production observations. SAP table activation, the supported import route, ABAP Unit results and 1k/10k SAP timings remain unverified until recorded from the assigned ADT tenant.
+**Verification & environment status:** Run `python3 tools/validate_import_fixtures.py` and `python3 tools/m1_import_oracle.py --report docs/m1-golden-import-results.md` to reproduce all 32 unit tests, edge fixtures, and 1k/10k benchmarks offline. Live SAP BTP ABAP Environment activation remains gated on provisioning a transportable non-`$TMP` package (`ZCCMC`; see [`docs/feasibility-note.md`](docs/feasibility-note.md) and [`docs/limitations.md`](docs/limitations.md)).
 
 ---
 
