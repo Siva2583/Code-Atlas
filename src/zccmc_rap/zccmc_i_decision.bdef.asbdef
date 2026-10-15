@@ -1,0 +1,132 @@
+managed implementation in class zccmc_bp_i_decision unique;
+strict ( 2 );
+
+/* Proposed RAP Behavior Definition for Migration Decision (Member 3 - M3-D03..D07)
+ * STATUS: Proposed artifact; requires non-$TMP package and activated M1/M3 tables in ADT.
+ * All state, role, SoD, reason, and concurrency validations delegate to ZCCMC_CL_DECISION_WORKFLOW.
+ */
+define behavior for ZCCMC_I_Decision alias Decision
+persistent table zccmc_decision
+lock master
+authorization master ( global, instance )
+etag master ChangedAt
+{
+  field ( readonly, numbering : managed ) DecisionUUID;
+  field ( readonly )
+    ObjectUUID,
+    RecommendedStrategy,
+    FinalStrategy,
+    RuleSetVersion,
+    RecommendationRunID,
+    Status,
+    OwnerUser,
+    CreatedBy,
+    SubmittedBy,
+    CreatedAt,
+    ChangedAt,
+    EvidenceSummary,
+    MissingEvidence,
+    MatchedRuleIDs,
+    ReReviewRequired,
+    VersionNo;
+
+  /* Direct CRUD updates/deletes are disabled; state changes occur only via governed actions */
+  create ( authorization : global );
+  update ( features : instance );
+  delete ( features : instance );
+
+  /* Governed Lifecycle Actions (docs/state-transitions.md section 4) */
+  action ( features : instance, authorization : instance ) submitDecision result [1] $self;
+  action ( features : instance, authorization : instance ) resubmitDecision parameter ZCCMC_A_DecisionReason result [1] $self;
+  action ( features : instance, authorization : instance ) approveDecision result [1] $self;
+  action ( features : instance, authorization : instance ) overrideDecision parameter ZCCMC_A_OverrideParam result [1] $self;
+  action ( features : instance, authorization : instance ) returnDecision parameter ZCCMC_A_DecisionReason result [1] $self;
+  action ( features : instance, authorization : instance ) assignOwner parameter ZCCMC_A_AssignOwnerParam result [1] $self;
+  action ( features : instance, authorization : instance ) startWork result [1] $self;
+  action ( features : instance, authorization : instance ) blockWork parameter ZCCMC_A_DecisionReason result [1] $self;
+  action ( features : instance, authorization : instance ) unblockWork parameter ZCCMC_A_DecisionReason result [1] $self;
+  action ( features : instance, authorization : instance ) markMigrated parameter ZCCMC_A_DecisionReason result [1] $self;
+  action ( features : instance, authorization : instance ) reopenDecision parameter ZCCMC_A_DecisionReason result [1] $self;
+
+  /* Server-side validations */
+  validation validateUniqueness on save { create; }
+
+  /* Strictly append-only child composition for Audit Events */
+  association _AuditTrail { create ( features : instance ); }
+
+  mapping for zccmc_decision
+  {
+    DecisionUUID        = decision_uuid;
+    ObjectUUID          = object_uuid;
+    RecommendedStrategy = recommended_strategy;
+    FinalStrategy       = final_strategy;
+    RuleSetVersion      = ruleset_version;
+    RecommendationRunID = recommendation_run_id;
+    Status              = status;
+    OwnerUser           = owner_user;
+    CreatedBy           = created_by;
+    SubmittedBy         = submitted_by;
+    CreatedAt           = created_at;
+    ChangedAt           = changed_at;
+    EvidenceSummary     = evidence_summary;
+    MissingEvidence     = missing_evidence;
+    MatchedRuleIDs      = matched_rule_ids;
+    ReReviewRequired    = re_review_required;
+    VersionNo           = version_no;
+  }
+}
+
+define behavior for ZCCMC_I_DecisionAudit alias AuditEvent
+persistent table zccmc_decaudit
+lock dependent by _Decision
+authorization dependent by _Decision
+etag dependent by _Decision
+{
+  field ( readonly, numbering : managed ) EventUUID;
+  field ( readonly )
+    DecisionUUID,
+    SequenceNo,
+    EventType,
+    ActorUser,
+    EventTimestamp,
+    OldStatus,
+    NewStatus,
+    OldStrategy,
+    NewStrategy,
+    OldOwner,
+    NewOwner,
+    Reason,
+    RuleSetVersion,
+    RecommendationRunID,
+    CorrelationID,
+    ImportBatchUUID,
+    SoDEnabled;
+
+  /* Append-only: update and delete are forbidden on audit records */
+  update ( features : instance );
+  delete ( features : instance );
+
+  association _Decision;
+
+  mapping for zccmc_decaudit
+  {
+    EventUUID           = event_uuid;
+    DecisionUUID        = decision_uuid;
+    SequenceNo          = sequence_no;
+    EventType           = event_type;
+    ActorUser           = actor_user;
+    EventTimestamp      = event_timestamp;
+    OldStatus           = old_status;
+    NewStatus           = new_status;
+    OldStrategy         = old_strategy;
+    NewStrategy         = new_strategy;
+    OldOwner            = old_owner;
+    NewOwner            = new_owner;
+    Reason              = reason;
+    RuleSetVersion      = ruleset_version;
+    RecommendationRunID = recommendation_run_id;
+    CorrelationID       = correlation_id;
+    ImportBatchUUID     = import_batch_uuid;
+    SoDEnabled          = sod_enabled;
+  }
+}

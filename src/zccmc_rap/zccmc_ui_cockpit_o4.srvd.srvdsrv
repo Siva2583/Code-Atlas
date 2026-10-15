@@ -1,0 +1,8 @@
+@EndUserText.label: 'Clean Core Migration Cockpit Service Definition (Proposed M3)'
+define service ZCCMC_UI_COCKPIT_O4 {
+  expose ZCCMC_C_CustomObject   as CustomObjects;
+  expose ZCCMC_C_Decision       as Decisions;
+  expose ZCCMC_C_DecisionAudit  as AuditTrail;
+  expose ZCCMC_C_ImportBatch    as ImportBatches;
+  expose ZCCMC_C_ImportRowError as ImportRowErrors;
+}

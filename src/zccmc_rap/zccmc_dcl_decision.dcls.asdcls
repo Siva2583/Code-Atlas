@@ -1,0 +1,13 @@
+@EndUserText.label: 'Access Control for Migration Decision & Audit (Proposed M3)'
+@MappingRole: true
+define role ZCCMC_DCL_DECISION {
+  /* Read access is permitted to authenticated Developer, Reviewer, Admin, and Auditor roles.
+   * Mutating workflow actions and Separation of Duties (SoD) are enforced server-side in
+   * ZCCMC_BP_I_DECISION / ZCCMC_CL_DECISION_WORKFLOW.
+   */
+  grant select on ZCCMC_I_Decision
+    where ( Status is not initial );
+
+  grant select on ZCCMC_I_DecisionAudit
+    where ( DecisionUUID is not initial );
+}
