@@ -1,113 +1,95 @@
-## Rules : paper tests, fixtures and test status
+# Clean Core Migration Cockpit — Shared Test Matrix (Days 1–11 Complete)
 
-All sample data is DEMO / SYNTHETIC. Evaluation date for all expected values: 2026-10-14.
-Status legend. "Oracle" = tools/m2_rules_oracle.py, a Python reference model that passed (not the product). "ABAP Unit" = src/zccmc_test/zccmc_ut_rule_engine.clas.abap, written but NOT compiled and NOT run: the ADT tenant was not available.
+All sample data in this repository is **DEMO / SYNTHETIC**.  
+- **Evaluation Date for Member 2 Rules & Analytics:** `2026-10-14` (`iv_evaluation_date = '20261014'`)  
+- **Frozen Rule-Set Version:** `ZCCMC_DEMO` / `1.0.0`  
+- **Total ABAP Unit Test Methods Across Repository:** **`100` ABAP Unit Tests** (`32` Member 1 Import + `44` Member 2 Rules & Analytics + `24` Member 3 Workflow & Security)  
+- **Status Legend:**
+  - **Oracle Passed:** Verified by the standalone Python reference runners (`tools/m1_import_oracle.py`, `tools/validate_import_fixtures.py`, `tools/m2_rules_oracle.py`, `tools/m3_workflow_oracle.py`).
+  - **ABAP Unit Ready (Pending ADT Package):** ABAP Unit test classes (`zccmc_ut_import_validator`, `zccmc_ut_import_idempotency`, `zccmc_ut_import_edge_cases`, `zccmc_ut_rule_engine`, `zccmc_ut_portfolio_analytics`, `zccmc_ut_decision_workflow`) are implemented and cross-checked against the oracles; live ADT execution (`Ctrl+Shift+F10`) awaits transportable non-`$TMP` package provisioning (`ZCCMC`) in the shared SAP BTP trial tenant.
 
-| Test | Expected | Sample CSV fixture (data-contract v0.2) | ABAP Unit method | Status |
+---
+
+## 1. Member 2 — Rules Engine Test Matrix (`ZCCMC_UT_RULE_ENGINE` — 31 Tests, Frozen v1.0.0)
+
+ABAP Unit class: `src/zccmc_test/zccmc_ut_rule_engine.clas.abap` testing `src/zccmc_core/zccmc_cl_rule_engine.clas.abap`.  
+Reference oracle: `tools/m2_rules_oracle.py` and `docs/m2-golden-results.md`.
+
+| Test ID / Method | Scenario & Input Facts | Expected Output (`Strategy`, `MatchedRuleIDs`, `MissingEvidence`) | Sample CSV / Fixture Source | Status |
 |---|---|---|---|---|
-| T1 run 0, 12-month window, LOW, findings coverage known and none, no caller | RETIRE_CANDIDATE, matched R20 | none: GAP (request to Member 1) | T01 | In-code data. Oracle passed. ABAP Unit not run. |
-| T2 same as T1 with an 11-month window | MANUAL_REVIEW, WINDOW_TOO_SHORT | ZMM_STOCK_ALERT is a short-window case (2 months), not the 11-month boundary | T02, T23 | In-code data. Oracle passed. ABAP Unit not run. |
-| T3 same as T1, called by a HIGH object | MANUAL_REVIEW, NO_RULE_MATCH | none: GAP (the 2 dependencies point at used objects) | T03 | In-code data. Oracle passed. ABAP Unit not run. |
-| T4 HIGH, 12 months, used, findings coverage known and none | KEEP_ADAPT, R60 | none: GAP (the HIGH objects have 2 and 1 HIGH findings) | T04 | In-code data. Oracle passed. ABAP Unit not run. |
-| T5 same as T4 with one HIGH finding | MANUAL_REVIEW, R30 | ZSD_CUST_CREDIT_CHECK, ZSD_OPEN_ORDERS_RPT | T05, T27 | Covered by CSV and in-code. Oracle passed. ABAP Unit not run. |
-| T6 MEDIUM, 15210 runs, one LOW finding | KEEP_ADAPT, R60 | ZCL_PRICING_HELPER | T06, T27 | Covered. Oracle passed. ABAP Unit not run. |
-| T7 criticality UNKNOWN, rest complete | MANUAL_REVIEW, CRITICALITY_UNKNOWN, matched R10 and R60 | ZCL_INVOICE_UTIL, ZHR_PAYROLL_ADJ (now covered: findings_as_of is set on both) | T07, T27 | Covered. Oracle passed. ABAP Unit not run. |
-| T8 no usage row | MANUAL_REVIEW, NO_USAGE_FACT | ZFI_OLD_LEDGER_EXPORT | T08, T27 | Covered. Oracle passed. ABAP Unit not run. |
-| T9 two rules, same priority, different outcomes | MANUAL_REVIEW, RULE_CONFLICT, both rule IDs matched | rule configuration, not CSV | T09, T17 (same outcome is no conflict) | Test rule set in code. Oracle passed. ABAP Unit not run. |
-| T10 run 0 but last_executed set | MANUAL_REVIEW, ZERO_RUNS_WITH_LAST_EXECUTED | none: GAP | T10 | In-code data. Oracle passed. ABAP Unit not run. |
-| Run > 0 but last_executed empty | MANUAL_REVIEW, RUNS_WITHOUT_LAST_EXECUTED | none: GAP | T11 | In-code data. Oracle passed. ABAP Unit not run. |
-| period_end before period_start | MANUAL_REVIEW, PERIOD_END_BEFORE_START only | none: GAP | T12 | In-code data. Oracle passed. ABAP Unit not run. |
-| Stale evidence: 30 days old is fresh, 31 days is stale | KEEP_ADAPT / MANUAL_REVIEW EVIDENCE_STALE | none: GAP (all evidence_as_of are 2026-10-13) | T13 | In-code data. Oracle passed. ABAP Unit not run. |
-| findings_as_of blank | MANUAL_REVIEW, FINDINGS_NOT_LOADED | none (all 7 objects have it set) | T14 | In-code data. Oracle passed. ABAP Unit not run. |
-| Several usage rows (proposed behavior, C1) | MANUAL_REVIEW, MULTIPLE_USAGE_FACTS | none | T15, T26 | Proposed. Oracle passed. ABAP Unit not run. |
-| Unknown caller criticality (proposed behavior, C4) | MANUAL_REVIEW only on the retirement path | none | T16 | Proposed. Oracle passed. ABAP Unit not run. |
-| No active rule matches; rule inactive | MANUAL_REVIEW, NO_RULE_MATCH | rule configuration | T18, T21 | Oracle passed. ABAP Unit not run. |
-| R10 missing from the rule set, evidence problem | still MANUAL_REVIEW (safety invariant) | rule configuration | T19 | Oracle passed. ABAP Unit not run. |
-| Rule with unknown condition code | MANUAL_REVIEW, UNKNOWN_CONDITION_CODE | rule configuration | T20 | Proposed. Oracle passed. ABAP Unit not run. |
-| INFO, LOW, MEDIUM findings do not count as HIGH | KEEP_ADAPT, R60 | ZCL_PRICING_HELPER | T22 | Oracle passed. ABAP Unit not run. |
-| Whole-month boundaries (12 / 11, month end, leap day) | see rules-spec section 11 | none | T23 | Oracle passed. ABAP Unit not run. |
-| Result fields and explanation content | rule-set id and version, run id passed through, rule ID and evidence values in the text, run id never in the text | none | T24 | Oracle does not render explanation text. ABAP Unit not run. |
-| Determinism: two runs, only the run id differs | identical | all 7 sample objects | T25 | Oracle: 2 clean runs identical. ABAP Unit not run. |
-| Permutation: row order of findings, callers, usage rows, rule rows | identical | all 4 sample files | T26 | Oracle: 200 random orders of all four files and 20 rule-order shuffles of 25 scenarios, 0 differences. ABAP Unit not run. |
-| All 7 sample objects against the golden table | docs/m2-golden-results.md | objects, usage, findings, dependencies CSVs | T27 | Oracle passed against the CSV files. ABAP T27 uses in-code copies of the same values. Not run. |
+| `T01` (`t01_no_use_12_months_retire`) | `run_count = 0`, 12-month window (`2025-10-13`..`2026-10-13`), criticality `LOW`, `findings_as_of` set (`0` findings), no caller | `RETIRE_CANDIDATE`, matched `R20`, missing `[]` | In-code boundary fixture (Paper `T1`) | Oracle passed. ABAP Unit ready (`T01`). |
+| `T02` (`t02_no_use_11_months_manual`) | Same as `T01` with 11-month window (`2025-11-13`..`2026-10-13`) | `MANUAL_REVIEW`, matched `R10`, missing `WINDOW_TOO_SHORT` | In-code 11-month boundary + `ZMM_STOCK_ALERT` (2 months) | Oracle passed. ABAP Unit ready (`T02`, `T23`). |
+| `T03` (`t03_high_caller_no_match`) | Same as `T01`, but called by a `HIGH`-criticality object | `MANUAL_REVIEW`, matched `[]`, missing `NO_RULE_MATCH` | In-code fixture (Paper `T3`) | Oracle passed. ABAP Unit ready (`T03`). |
+| `T04` (`t04_used_zero_findings_keep`) | `run_count = 2480`, criticality `HIGH`, 12-month window, `findings_as_of` set (`0` findings) | `KEEP_ADAPT`, matched `R60`, missing `[]` | In-code boundary fixture (Paper `T4`) | Oracle passed. ABAP Unit ready (`T04`). |
+| `T05` (`t05_one_high_finding_manual`) | Same as `T04` with `1` `HIGH` finding | `MANUAL_REVIEW`, matched `R30`, missing `[]` | `ZSD_CUST_CREDIT_CHECK` (`1 HIGH`), `ZSD_OPEN_ORDERS_RPT` (`2 HIGH`) | Oracle passed. ABAP Unit ready (`T05`, `T27`). |
+| `T06` (`t06_used_low_finding_keep`) | `run_count = 15210`, criticality `MEDIUM`, `1` `LOW` finding | `KEEP_ADAPT`, matched `R60`, missing `[]` | `ZCL_PRICING_HELPER` (`objects.csv`, `usage.csv`, `findings.csv`) | Oracle passed. ABAP Unit ready (`T06`, `T27`). |
+| `T07` (`t07_criticality_unknown_manual`) | `criticality = UNKNOWN`, rest complete (`100` runs, `0` findings) | `MANUAL_REVIEW`, matched `R10, R60`, missing `CRITICALITY_UNKNOWN` | `ZCL_INVOICE_UTIL`, `ZHR_PAYROLL_ADJ` | Oracle passed. ABAP Unit ready (`T07`, `T27`). |
+| `T08` (`t08_no_usage_row_manual`) | No usage row for object (`usages` empty) | `MANUAL_REVIEW`, matched `R10`, missing `NO_USAGE_FACT` | `ZFI_OLD_LEDGER_EXPORT` | Oracle passed. ABAP Unit ready (`T08`, `T27`). |
+| `T09` (`t09_equal_priority_conflict`) | Active rule `R61` at priority `60` (`REWRITE_RAP`) ties with `R60` (`KEEP_ADAPT`) | `MANUAL_REVIEW`, matched `R60, R61`, missing `RULE_CONFLICT`, explanation names both rules | In-code rule-set configuration (Paper `T9`) | Oracle passed. ABAP Unit ready (`T09`). |
+| `T10` (`t10_zero_runs_with_date_manual`) | Contradictory usage: `run_count = 0` and `last_executed = 2025-09-25` | `MANUAL_REVIEW`, matched `R10, R20`, missing `ZERO_RUNS_WITH_LAST_EXECUTED` | In-code fixture (Paper `T10`) | Oracle passed. ABAP Unit ready (`T10`). |
+| `T11` (`t11_runs_without_date_manual`) | Contradictory usage: `run_count > 0` and `last_executed` initial | `MANUAL_REVIEW`, matched `R10, R60`, missing `RUNS_WITHOUT_LAST_EXECUTED` | In-code fixture | Oracle passed. ABAP Unit ready (`T11`). |
+| `T12` (`t12_period_end_before_start`) | Contradictory window: `period_end < period_start` | `MANUAL_REVIEW`, matched `R10, R60`, missing `PERIOD_END_BEFORE_START` only | In-code fixture | Oracle passed. ABAP Unit ready (`T12`). |
+| `T13` (`t13_staleness_boundary`) | `evidence_as_of` age `30` days (`2026-09-14`) vs. `31` days (`2026-09-13`) on `2026-10-14` | `30` days → `KEEP_ADAPT` (`R60`); `31` days → `MANUAL_REVIEW` (`R10, R60`, `EVIDENCE_STALE`) | In-code boundary fixtures | Oracle passed. ABAP Unit ready (`T13`). |
+| `T14` (`t14_findings_coverage_unknown`) | `findings_as_of` blank/initial | `MANUAL_REVIEW`, matched `R10, R60`, missing `FINDINGS_NOT_LOADED` | In-code fixture | Oracle passed. ABAP Unit ready (`T14`). |
+| `T15` (`t15_multiple_usage_facts`) | Two usage rows supplied for the same object (`C1`) | `MANUAL_REVIEW`, matched `R10`, missing `MULTIPLE_USAGE_FACTS` | In-code fixture | Oracle passed. ABAP Unit ready (`T15`). |
+| `T16` (`t16_caller_criticality_unknown`) | `UNKNOWN` caller criticality when unused (`run_count = 0`) vs. used (`run_count > 0`) vs. `MEDIUM`/`LOW` callers (`C4`) | Unused + `UNKNOWN` caller → `MANUAL_REVIEW` (`CALLER_CRITICALITY_UNKNOWN`); known non-`HIGH` callers → `RETIRE_CANDIDATE`; used + `UNKNOWN` caller → `KEEP_ADAPT` | In-code fixtures | Oracle passed. ABAP Unit ready (`T16`). |
+| `T17` (`t17_same_priority_same_outcome`) | Duplicate rule `R62` at priority `60` with same `KEEP_ADAPT` outcome as `R60` | `KEEP_ADAPT`, matched `R60, R62`, missing `[]` (no conflict) | In-code rule-set configuration | Oracle passed. ABAP Unit ready (`T17`). |
+| `T18` (`t18_no_rule_matches`) | Rule set containing `R20` only evaluated against a used object | `MANUAL_REVIEW`, matched `[]`, missing `NO_RULE_MATCH` | In-code rule-set configuration | Oracle passed. ABAP Unit ready (`T18`). |
+| `T19` (`t19_missing_r10_still_manual`) | Rule `R10` deleted from rule set, evaluated with `criticality = UNKNOWN` | `MANUAL_REVIEW` (hard safety invariant), matched `R60`, missing `CRITICALITY_UNKNOWN` | In-code rule-set configuration | Oracle passed. ABAP Unit ready (`T19`). |
+| `T20` (`t20_unknown_condition_code`) | Active rule `RX` with unknown condition code `NOT_A_REAL_CONDITION` | `MANUAL_REVIEW`, matched `R60`, missing `UNKNOWN_CONDITION_CODE` | In-code rule-set configuration | Oracle passed. ABAP Unit ready (`T20`). |
+| `T21` (`t21_inactive_rule_is_ignored`) | Rule `R60` set `active = abap_false` | `MANUAL_REVIEW`, matched `[]`, missing `NO_RULE_MATCH` | In-code rule-set configuration | Oracle passed. ABAP Unit ready (`T21`). |
+| `T22` (`t22_info_and_medium_not_high`) | Used object with `2 MEDIUM`, `1 LOW`, `1 INFO` findings (`0 HIGH`) | `KEEP_ADAPT`, matched `R60`, missing `[]` | In-code fixture + `ZCL_PRICING_HELPER` | Oracle passed. ABAP Unit ready (`T22`). |
+| `T23` (`t23_whole_months_boundaries`) | `whole_months_between` across 7 date pairs (12 mo, 11 mo, 2 mo, Jan 31→Feb 28 clamp, leap year Feb 29→Feb 28, same day, end < start) | `12, 11, 2, 1, 12, 0, 0` | `docs/rules-spec.md` §9 | Oracle passed. ABAP Unit ready (`T23`). |
+| `T24` (`t24_result_and_explanation`) | Full result fields & explanation trace (`ZCCMC_DEMO`, `1.0.0`, `run_id` passed through and excluded from explanation text) | Exact match on `object_id`, `run_id`, `ruleset_id`, `ruleset_version`, and `explanation` | In-code fixture + all 7 golden objects | Oracle passed (renders & checks exact explanations). ABAP Unit ready (`T24`). |
+| `T25` (`t25_repeat_run_is_identical`) | Evaluate twice with `RUN-A` and `RUN-B` | Identical result tuple apart from `run_id` | In-code fixture + 2 clean CSV runs | Oracle passed. ABAP Unit ready (`T25`). |
+| `T26` (`t26_row_order_does_not_matter`) | Reverse findings, callers, usage rows, and rule rows | Identical result tuple | 200 random CSV permutations + 20x rule shuffles | Oracle passed (`0` differences). ABAP Unit ready (`T26`). |
+| `T27` (`t27_sample_objects_golden`) | Evaluate all 7 synthetic sample objects against frozen golden table | `6 MANUAL_REVIEW`, `1 KEEP_ADAPT`, exact rules, missing codes & explanations | `data/sample-synthetic/*.csv` | Oracle passed. ABAP Unit ready (`T27`). |
+| `T28` (`t28_portfolio_batch_and_perm`) | `evaluate_portfolio` across two clean runs and reversed object input order (`M2-D08-T01`) | Byte-for-byte identical 7-object result tables sorted by `object_id` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T28`). |
+| `T29` (`t29_no_cross_object_leakage`) | Verify unrelated objects in a portfolio batch never leak facts or missing codes into another object's explanation (`M2-D08-T01`) | Batch result for `ZCL_PRICING_HELPER` equals standalone result; zero cross-object leakage | All 7 sample objects | Oracle passed. ABAP Unit ready (`T29`). |
+| `T30` (`t30_edge_and_corrected_fixtures`) | Evaluate `ZSD_OPEN_ORDERS_RPT` after `objects_corrected_batch.csv` and `findings_quoted_fields.csv` (`F900 LOW`) (`M2-D08-T01` / `M2-D10-T01`) | Result tuple (`MANUAL_REVIEW`, `R30`, `high_findings=2`) and explanation remain 100% unchanged | `edge-cases/objects_corrected_batch.csv`, `edge-cases/findings_quoted_fields.csv` | Oracle passed. ABAP Unit ready (`T30`). |
+| `T31` (`t31_m1_import_evidence_bridge`) | Build normalized evidence via `build_evidence_from_import` aligned with Member 1's `zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj` | `KEEP_ADAPT`, matched `R60`, missing `[]`, normalized uppercase fields | M1→M2 orchestrator bridge fixture | Oracle passed. ABAP Unit ready (`T31`). |
 
-Open decisions that can change these expectations: docs/m2-contract-review.md C1 to C14.
-Not tested: REWRITE_RAP and SIDE_BY_SIDE_BTP (no source data), portfolio metrics (none agreed), rule-set persistence and immutability (no entity yet).
-Running everything: python tools/m2_rules_oracle.py (records in docs/m2-golden-results.md); ABAP Unit in ADT with Ctrl+Shift+F10 on classes ZCCMC_UT_RULE_ENGINE and ZCCMC_UT_PORTFOLIO_ANALYTICS.
+---
 
-## Portfolio Analytics : unit tests and reconciliation status (Member 2 — Day 6 `M2-D06-T01`)
+## 2. Member 2 — Portfolio Analytics Test Matrix (`ZCCMC_UT_PORTFOLIO_ANALYTICS` — 13 Tests, Frozen v1.0.0)
 
 ABAP Unit class: `src/zccmc_test/zccmc_ut_portfolio_analytics.clas.abap` testing `src/zccmc_core/zccmc_cl_portfolio_analytics.clas.abap`.
 
-| Test | Expected | Sample CSV fixture | ABAP Unit method | Status |
+| Test ID / Method | Scenario | Expected Result | Fixture Source | Status |
 |---|---|---|---|---|
-| PA-T01 Empty portfolio (`0` items) | `total_objects = 0`, all 5 strategy counts `0`, no missing reasons | empty list | `T01` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T02 Full 7-object sample reconciliation | `M-01 = 7`; `M-02`: `MANUAL_REVIEW = 6`, `KEEP_ADAPT = 1`; `M-03 = 4` (`CRITICALITY_UNKNOWN = 2`, `NO_USAGE_FACT = 1`, `WINDOW_TOO_SHORT = 1`) | all 7 sample objects | `T02` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T03 Filter by `package_name` & `criticality` | `ZSD_REPORTS` → `1 MANUAL_REVIEW`; `ZSD_PRICING` → `1 KEEP_ADAPT`; `criticality = HIGH` → `2 MANUAL_REVIEW` | `objects.csv` packages | `T03` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T04 Filter by `source_system` | `DEMO_SYS` → `7`; `NON_EXISTENT_SYS` → `0` | `objects.csv` | `T04` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T05 Filter by `strategy` and `only_missing_evidence` | `KEEP_ADAPT` → `1`; `only_missing_evidence = true` → `4` | all 7 sample objects | `T05` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T06 1:N join duplicate row & reason-code deduplication | 6 repeated rows for 1 object still yield `total_objects = 1` and `reason_count = 1` | simulated join rows | `T06` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T07 Multi-run deduplication (latest run wins) | `RUN-0002` supersedes `RUN-0001` for the same object key | in-code 2-run fixture | `T07` | Oracle passed. ABAP Unit written, pending ADT run. |
-| PA-T08 Input row-order determinism | Reversed item table produces identical `ty_summary` | all 7 sample objects | `T08` | Oracle passed. ABAP Unit written, pending ADT run. |
-
-
----
-
----
-
-# Test Matrix — Member 1 Persistence, CSV Import & Provenance (`M1-D01-T01` .. `M1-D11-T01`)
-
-**Status:** All 32 unit-test scenarios (`IMP-V01..V12`, `IMP-I01..I10`, `IMP-E01..E10`), 6 edge-case fixtures, 200 row-order permutations, 1k/10k scale runs, and Day-10 clean reset reproducibility are implemented in `src/zccmc_test/zccmc_ut_import_*.clas.abap` and **PASSED** via `tools/m1_import_oracle.py` and `tools/validate_import_fixtures.py` (recorded in `docs/m1-golden-import-results.md`). Live SAP ADT execution awaits non-`$TMP` package provisioning (`docs/feasibility-note.md` F-02).
-
-## 1. CSV Parser & Validator Suite (`src/zccmc_test/zccmc_ut_import_validator.clas.abap`)
-
-| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
-|---|---|---|---|---|---|
-| `IMP-V01` | Parse and validate all 4 template headers (`objects`, `usage`, `findings`, `dependencies`) | Exact ordered match against contract v0.3 | `data/templates/*.csv` | `t01_four_template_headers_pass` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V02` | Header mismatch (missing `findings_as_of` or wrong column order) | File rejected with `HEADER_MISMATCH` | In-code header fixture | `t02_header_mismatch_rejected` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V03` | Header-only file (`objects_empty.csv`) | File rejected with `EMPTY_FILE`, `0` valid rows | `edge-cases/objects_empty.csv` | `t03_empty_file_rejected` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V04` | RFC 4180 quoted field with comma and escaped quotes (`""`) | Parsed as 1 field: `DEMO quoted, comma and "quote" fixture` | `edge-cases/findings_quoted_fields.csv` | `t04_rfc4180_quotes_and_commas` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V05` | Leading UTF-8 BOM (`U+FEFF`) and `CRLF` record endings | BOM stripped, records parsed without header drift | In-code BOM + CRLF fixture | `t05_utf8_bom_and_crlf_handled` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V06` | Unclosed quote or unescaped quote mid-field | Parse fails with `MALFORMED_CSV` and 1-based record number | In-code malformed CSV | `t06_malformed_csv_unclosed_q` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V07` | Data row with too few or too many columns | Row rejected with `COLUMN_COUNT_MISMATCH` | In-code 6-col dependency row | `t07_column_count_mismatch` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V08` | Intra-file duplicate business key (`objects_duplicate_keys.csv`) | **Both** rows (`record 2` & `3`) rejected with `DUPLICATE_KEY` | `edge-cases/objects_duplicate_keys.csv` | `t08_duplicate_keys_both_reject` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V09` | Calendar date validation (`2026-02-30`, `2026-02-29` vs. leap `2024-02-29`) | Non-calendar dates rejected with `INVALID_DATE` naming field | `edge-cases/usage_malformed_date.csv` | `t09_malformed_and_calendar_dt` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V10` | Enum & blank rules (blank `criticality` -> `UNKNOWN`; blank `severity` -> error) | Blank `criticality` = `UNKNOWN`; bad enum = `INVALID_ENUM`; blank `severity` = `MISSING_REQUIRED_FIELD` | In-code enum fixtures | `t10_enum_and_criticality_rules` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V11` | Integer & negative `run_count` validation | `< 0` -> `NEGATIVE_RUN_COUNT`; decimal/alpha -> `INVALID_INTEGER` | In-code usage fixtures | `t11_integer_and_neg_run_count` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-V12` | Key trimming and uppercase normalization | Keys & enums uppercased; free-text `description`/`message` case preserved | In-code mixed-case row | `t12_key_normalization_trimming` | Oracle passed. ABAP Unit written, pending ADT run. |
-
-## 2. Idempotency, Corrections, Provenance & Cross-Team Integration Suite (`src/zccmc_test/zccmc_ut_import_idempotency.clas.abap`)
-
-| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
-|---|---|---|---|---|---|
-| `IMP-I01` | Clean 4-file baseline import in frozen order (`objects` -> `usage` -> `findings` -> `dependencies`) | `COMMITTED`: `7` objects, `6` usages, `8` findings, `2` dependencies `INSERTED`; `0` errors | `data/sample-synthetic/*.csv` | `t01_clean_four_file_baseline` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I02` | Immediate repeat import of all 4 baseline files | `COMMITTED`: `7`, `6`, `8`, `2` `UNCHANGED`; `0` duplicates; `ObjectUUID`s preserved; new `BatchUUID`s recorded | `data/sample-synthetic/*.csv` | `t02_repeat_import_unchanged` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I03` | Corrected object batch (`objects_corrected_batch.csv`) | `COMMITTED`: `1 UPDATED` (`ZSD_OPEN_ORDERS_RPT` description updated in place), `ObjectUUID` preserved, total objects = `7` | `edge-cases/objects_corrected_batch.csv` | `t03_corrected_batch_in_place` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I04` | Replay baseline `objects.csv` after corrected batch | `COMMITTED`: `1 UPDATED` (reverted) + `6 UNCHANGED` = `7` accepted | `data/sample-synthetic/objects.csv` | `t04_replay_baseline_after_corr` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I05` | Dependent entity (`usage`) upsert idempotency | Modified `run_count` on existing usage key yields `1 UPDATED`, total usages = `6` | In-code usage update | `t05_dependent_upsert_semantics` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I06` | Day-10 clean reset (`reset_synthetic_store`) and two consecutive clean runs | Both runs produce identical counts (`7`, `6`, `8`, `2`), business keys, and `row_sha256` digests | `data/sample-synthetic/*.csv` | `t06_clean_reset_reproducible` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I07` | Input row-order permutation across all 4 files (200 random shuffles in oracle) | Identical persisted entity state and `row_sha256` digests | Permuted `sample-synthetic/*.csv` | `t07_row_order_permutation_det` | Oracle passed (200/200). ABAP Unit written, pending ADT run. |
-| `IMP-I08` | M1 -> M2 bridge (`build_m2_evidence_for_object` -> `zccmc_cl_rule_engine=>evaluate`) | Evaluates persisted M1 data to exact M2 golden outcomes (`6 MANUAL_REVIEW`, `1 KEEP_ADAPT`) | `data/sample-synthetic/*.csv` | `t08_m1_to_m2_evidence_bridge` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I09` | M1 -> M3 `ObjectUUID` foreign-key stability across re-imports | `ObjectUUID` linked by M3 `ZCCMC_DECISION` remains unchanged after M1 repeat and corrected imports | `objects.csv` + `objects_corrected_batch.csv` | `t09_m1_to_m3_uuid_stability` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-I10` | Append-only provenance ledger (`batches`, `row_results`, `row_errors`) | Prior batches and row results remain intact after subsequent imports | Multi-batch sequence | `t10_append_only_provenance` | Oracle passed. ABAP Unit written, pending ADT run. |
-
-## 3. Edge Cases, Reference Ordering, Rollback & Scale Suite (`src/zccmc_test/zccmc_ut_import_edge_cases.clas.abap`)
-
-| Test ID | Scenario | Expected Result | Fixture / Input | ABAP Unit Method | Status |
-|---|---|---|---|---|---|
-| `IMP-E01` | Import `objects_empty.csv` into orchestrator | Batch `FAILED` with `EMPTY_FILE`; `0` objects written | `edge-cases/objects_empty.csv` | `t01_edge_objects_empty` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E02` | Import `objects_duplicate_keys.csv` into orchestrator | Batch `FAILED`; `parsed = 2`, `accepted = 0`, `rejected = 2` (`DUPLICATE_KEY` on both rows) | `edge-cases/objects_duplicate_keys.csv` | `t02_edge_objects_duplicate_keys` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E03` | Import `usage_malformed_date.csv` after baseline objects | Batch `FAILED`; `1 REJECTED` with `INVALID_DATE` on `period_start` (`2026-02-30`) | `edge-cases/usage_malformed_date.csv` | `t03_edge_usage_malformed_date` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E04` | Import `findings_unknown_object.csv` after baseline objects | Batch `FAILED`; `1 REJECTED` with `UNKNOWN_OBJECT` on `object_name`; zero orphan findings | `edge-cases/findings_unknown_object.csv` | `t04_edge_findings_unknown_obj` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E05` | Import `findings_quoted_fields.csv` after baseline objects | Batch `COMMITTED`; `1 INSERTED` with comma and escaped quotes preserved | `edge-cases/findings_quoted_fields.csv` | `t05_edge_findings_quoted_fields` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E06` | Reverse-order import (`usage`, `findings`, `dependencies` before `objects`) | All dependent rows rejected with `UNKNOWN_OBJECT`; loading `objects` later does **not** silently replay them | `data/sample-synthetic/*.csv` (reversed) | `t06_reverse_order_no_replay` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E07` | Partial-batch commit (1 valid row + 1 invalid row in same file) | Batch `COMMITTED` (`accepted = 1`, `rejected = 1`); valid row persisted, invalid row recorded in `row_errors` | In-code mixed batch | `t07_partial_batch_valid_invalid` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E08` | Unprovisioned `source_system` on object row | Row rejected with `UNKNOWN_SOURCE_SYSTEM`; zero objects created | In-code `UNPROVISIONED_SYS` | `t08_unknown_source_system_rej` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E09` | Fatal persistence failure (`simulate_persistence_failure = abap_true`) | File business writes rolled back atomically; batch `FAILED` with `PERSISTENCE_FAILURE`; no half-batch remains | Fault-injected object batch | `t09_fatal_persistence_rollback` | Oracle passed. ABAP Unit written, pending ADT run. |
-| `IMP-E10` | Bulk scale (`1,000` and `10,000` rows) & repeat-import idempotency | `1,000` and `10,000` rows `INSERTED` on pass 1 and `UNCHANGED` on pass 2; zero truncation or duplicate keys | `perf/objects_1000.csv`, `perf/objects_10000.csv` | `t10_scale_bulk_and_repeat` | Oracle passed (`docs/m1-golden-import-results.md`). ABAP Unit written, pending ADT run. |
+| `PA-T01` (`t01_empty_portfolio`) | Empty portfolio (`0` items) | `total_objects = 0`, all 5 strategy counts `0`, `by_missing_reason` empty | Empty table | Oracle passed. ABAP Unit ready (`T01`). |
+| `PA-T02` (`t02_sample_7_objects_reconcile`) | Full 7-object sample reconciliation | `M-01 = 7`; `M-02`: `MANUAL_REVIEW = 6`, `KEEP_ADAPT = 1`; `M-03 = 4` (`CRITICALITY_UNKNOWN = 2`, `NO_USAGE_FACT = 1`, `WINDOW_TOO_SHORT = 1`); `sum(by_strategy) == 7` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T02`). |
+| `PA-T03` (`t03_filter_by_package`) | Filter by `package_name` & `criticality` | `ZSD_REPORTS` → `1 MANUAL_REVIEW`; `ZSD_PRICING` → `1 KEEP_ADAPT`; `criticality = HIGH` → `2 MANUAL_REVIEW` | `objects.csv` packages | Oracle passed. ABAP Unit ready (`T03`). |
+| `PA-T04` (`t04_filter_by_source_system`) | Filter by `source_system` | `DEMO_SYS` → `7`; `NON_EXISTENT_SYS` → `0` | `objects.csv` | Oracle passed. ABAP Unit ready (`T04`). |
+| `PA-T05` (`t05_filter_by_strategy_missing`) | Filter by `strategy` and `only_missing_evidence` | `KEEP_ADAPT` → `1`; `only_missing_evidence = true` → `4` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T05`). |
+| `PA-T06` (`t06_no_join_double_counting`) | 1:N join duplicate row & reason-code deduplication | 6 repeated rows for 1 object still yield `total_objects = 1` and `reason_count = 1` | Simulated 1:N join rows | Oracle passed. ABAP Unit ready (`T06`). |
+| `PA-T07` (`t07_latest_run_wins`) | Multi-run deduplication (latest run wins) | `RUN-0002` (`KEEP_ADAPT`) supersedes `RUN-0001` (`MANUAL_REVIEW`) for the same object key | In-code 2-run fixture | Oracle passed. ABAP Unit ready (`T07`). |
+| `PA-T08` (`t08_row_order_determinism`) | Input row-order determinism | Reversed item table and 200 random shuffles produce identical `ty_summary` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T08`). |
+| `PA-T09` (`t09_filter_by_ruleset_version`) | Filter by `ruleset_version` (`M2-D09-T01`) | `ruleset_version = '1.0.0'` → `7`; `'0.1.0-DRAFT'` → `0` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T09`). |
+| `PA-T10` (`t10_groupings_sys_pkg_crit`) | Verify `by_source_system`, `by_package`, and `by_criticality` group counts (`M2-D09-T01`) | `DEMO_SYS = 7`; `7` packages (`1` each); `HIGH = 2`, `LOW = 1`, `MEDIUM = 2`, `UNKNOWN = 2` | All 7 sample objects | Oracle passed. ABAP Unit ready (`T10`). |
+| `PA-T11` (`t11_unknown_strategy_fallback`) | Blank or unrecognized strategy normalization (`M2-D09-T01`) | Both normalize to `MANUAL_REVIEW`; `by_strategy` strictly retains 5 canonical buckets | In-code edge fixture | Oracle passed. ABAP Unit ready (`T11`). |
+| `PA-T12` (`t12_missing_identity_and_id_fb`) | Blank `object_name` fallback to `object_id` and blank-identity skip (`M2-D09-T01`) | Blank-identity row skipped; `object_id`-fallback row counted once (`UNSPECIFIED` package) | In-code edge fixture | Oracle passed. ABAP Unit ready (`T12`). |
+| `PA-T13` (`t13_batch_build_from_m1_objects`) | Batch construction via `build_items_from_results` from Member 1 `CustomObject` metadata + `evaluate_portfolio` | Reconciles `total_objects`, `by_strategy`, and `by_package` across batch results | M1→M2 batch metadata fixture | Oracle passed. ABAP Unit ready (`T13`). |
 
 ---
 
-# Test Matrix — Member 3 Workflow, Authorization, SoD & Audit (`M3-D01-T01` .. `M3-D11-T01`)
+## 3. Member 1 — Data Persistence & Import Test Matrix (`32` Tests, Days 1–11 Complete)
 
-ABAP Unit class: `src/zccmc_test/zccmc_ut_decision_workflow.clas.abap` (`t01`..`t24`, `WF-T01`..`WF-T24`) testing `src/zccmc_rap/zccmc_cl_decision_workflow.clas.abap`. All 24 unit tests and 352 transition matrix combinations passed in `tools/m3_workflow_oracle.py` (see `docs/m3-golden-workflow-results.md` and `docs/m3-day1-day11-status.md`).
+ABAP Unit classes (`src/zccmc_test/`):
+- `zccmc_ut_import_validator.clas.abap` (`12` tests: `IMP-V01`..`IMP-V12`)
+- `zccmc_ut_import_idempotency.clas.abap` (`10` tests: `IMP-I01`..`IMP-I10`)
+- `zccmc_ut_import_edge_cases.clas.abap` (`10` tests: `IMP-E01`..`IMP-E10`)  
+Reference oracle & logs: `tools/m1_import_oracle.py`, `tools/validate_import_fixtures.py`, `docs/m1-golden-import-results.md`, and `docs/m1-day1-day11-status.md`.
+
+| Test Suite | Scenarios Covered | Expected Result | Status |
+|---|---|---|---|
+| `ZCCMC_UT_IMPORT_VALIDATOR` (`IMP-V01`..`IMP-V12`) | Exact 4-file header validation, RFC 4180 quoting/escaping, UTF-8 BOM stripping, required fields, enum normalization (`criticality` blank→`UNKNOWN`, `severity`), calendar date validation (`YYYY-MM-DD`), non-negative `run_count`. | Valid rows accepted; malformed rows rejected with exact `docs/data-contract.md` v0.3 error codes. | Oracle passed (`12/12`). ABAP Unit ready. |
+| `ZCCMC_UT_IMPORT_IDEMPOTENCY` (`IMP-I01`..`IMP-I10`) | Ordered 4-file import (`objects` → `usage` → `findings` → `dependencies`), repeat batch (`INSERTED` → `UNCHANGED`), `objects_corrected_batch.csv` (`UPDATED` with prior provenance retained in `ZCCMC_IMPROWRES`), `reset_synthetic_data` (`M1-D10-T01`), and `build_m2_evidence_for_obj` bridge. | Zero duplicate business keys; stable `ObjectUUID`; reproducible counts across consecutive resets. | Oracle passed (`10/10`). ABAP Unit ready. |
+| `ZCCMC_UT_IMPORT_EDGE_CASES` (`IMP-E01`..`IMP-E10`) | `objects_empty.csv` (`EMPTY_FILE`), `objects_duplicate_keys.csv` (`DUPLICATE_KEY`), `usage_malformed_date.csv` (`INVALID_DATE`), `findings_unknown_object.csv` (`UNKNOWN_OBJECT`), `findings_quoted_fields.csv` (RFC 4180 quotes preserved), reverse import order rejection, and `1,000` / `10,000` scale fixtures. | Exact row/batch status and SHA-256 digest recorded in `ZCCMC_IMPBATCH` & `ZCCMC_IMPROWERR`; zero silent row loss. | Oracle passed (`10/10`). ABAP Unit ready. |
+
+---
+
+## 4. Member 3 — Workflow, Security & Audit Test Matrix (`ZCCMC_UT_DECISION_WORKFLOW` — 24 Tests, Days 1–11 Complete)
+
+ABAP Unit class: `src/zccmc_test/zccmc_ut_decision_workflow.clas.abap` testing `src/zccmc_rap/zccmc_cl_decision_workflow.clas.abap`.  
+Reference oracle: `tools/m3_workflow_oracle.py` and `docs/m3-golden-workflow-results.md` (352 state×action×role combinations + 24 unit tests `WF-T01`..`WF-T24` passed).

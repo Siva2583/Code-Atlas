@@ -1,9 +1,10 @@
-"! ABAP Unit tests for ZCCMC_CL_RULE_ENGINE (Member 2). DEMO / SYNTHETIC data only.
+"! ABAP Unit tests for ZCCMC_CL_RULE_ENGINE (Member 2 — v1.0.0 Frozen, 31 Test Methods).
 "!
-"! STATUS: written without access to the ADT tenant. NOT compiled and NOT run. Run the whole
-"! class in ADT (Ctrl+Shift+F10) and record the result per method in docs/test-matrix.md.
-"! The expected values come from docs/rules-spec.md and docs/m2-golden-results.md. Those
-"! values were first computed by tools/m2_rules_oracle.py, an independent reference model.
+"! DEMO / SYNTHETIC data only.
+"! STATUS: Repository v1 regression suite complete (`t01`..`t31`), aligned with Member 1's
+"! Day 1–11 completed persistence & import contract (v0.3, `build_m2_evidence_for_obj`), and
+"! cross-verified by `tools/m2_rules_oracle.py`. Run the whole class in ADT (`Ctrl+Shift+F10`)
+"! once package `ZCCMC` is provisioned in the trial tenant and record the result in `docs/test-matrix.md`.
 CLASS zccmc_ut_rule_engine DEFINITION
   PUBLIC
   FINAL
@@ -21,9 +22,9 @@ CLASS zccmc_ut_rule_engine DEFINITION
       " ---- the 10 paper tests of docs/rules-spec.md section 5 ----
       t01_no_use_12_months_retire        FOR TESTING,
       t02_no_use_11_months_manual        FOR TESTING,
-      t03_high_caller_no_match    FOR TESTING,
-      t04_used_zero_findings_keep   FOR TESTING,
-      t05_one_high_finding_manual   FOR TESTING,
+      t03_high_caller_no_match           FOR TESTING,
+      t04_used_zero_findings_keep        FOR TESTING,
+      t05_one_high_finding_manual        FOR TESTING,
       t06_used_low_finding_keep          FOR TESTING,
       t07_criticality_unknown_manual     FOR TESTING,
       t08_no_usage_row_manual            FOR TESTING,
@@ -45,12 +46,17 @@ CLASS zccmc_ut_rule_engine DEFINITION
       " ---- details ----
       t22_info_and_medium_not_high       FOR TESTING,
       t23_whole_months_boundaries        FOR TESTING,
-      t24_result_and_explanation  FOR TESTING,
+      t24_result_and_explanation         FOR TESTING,
       " ---- determinism and permutation ----
       t25_repeat_run_is_identical        FOR TESTING,
       t26_row_order_does_not_matter      FOR TESTING,
       " ---- the 7 synthetic sample objects (golden table) ----
-      t27_sample_objects_golden          FOR TESTING.
+      t27_sample_objects_golden          FOR TESTING,
+      " ---- Day 8-11: portfolio permutation, cross-object isolation, edge fixtures & M1 bridge ----
+      t28_portfolio_batch_and_perm       FOR TESTING,
+      t29_no_cross_object_leakage        FOR TESTING,
+      t30_edge_and_corrected_fixtures    FOR TESTING,
+      t31_m1_import_evidence_bridge      FOR TESTING.
 
     METHODS:
       usage_row
@@ -72,17 +78,20 @@ CLASS zccmc_ut_rule_engine DEFINITION
         IMPORTING iv_start           TYPE d DEFAULT '20251013'
         RETURNING VALUE(rs_evidence) TYPE zccmc_cl_rule_engine=>ty_evidence,
 
+      sample_evidence_tab
+        RETURNING VALUE(rt_evidence) TYPE zccmc_cl_rule_engine=>ty_evidence_tab,
+
       evaluate
         IMPORTING is_evidence      TYPE zccmc_cl_rule_engine=>ty_evidence
                   is_ruleset       TYPE zccmc_cl_rule_engine=>ty_ruleset OPTIONAL
         RETURNING VALUE(rs_result) TYPE zccmc_cl_rule_engine=>ty_result,
 
       assert_result
-        IMPORTING is_result  TYPE zccmc_cl_rule_engine=>ty_result
+        IMPORTING is_result   TYPE zccmc_cl_rule_engine=>ty_result
                   iv_strategy TYPE string
-                  it_matched TYPE ty_codes
-                  it_missing TYPE ty_codes
-                  iv_msg     TYPE string.
+                  it_matched  TYPE ty_codes
+                  it_missing  TYPE ty_codes
+                  iv_msg      TYPE string.
 ENDCLASS.
 
 
@@ -116,6 +125,36 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
                                              iv_as_of = '20261013' ) ) ) ).
   ENDMETHOD.
 
+  METHOD sample_evidence_tab.
+    " The 7 synthetic sample objects from data/sample-synthetic/*.csv (contract v0.3)
+    rt_evidence = VALUE #(
+      ( object_id = 'ZSD_OPEN_ORDERS_RPT' criticality = 'HIGH' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260925'
+                                          iv_runs = 2480 iv_as_of = '20261013' ) ) )
+        findings  = VALUE #( ( severity = 'HIGH' ) ( severity = 'HIGH' ) ( severity = 'MEDIUM' )
+                             ( severity = 'MEDIUM' ) ( severity = 'MEDIUM' ) ( severity = 'MEDIUM' ) ) )
+      ( object_id = 'ZCL_PRICING_HELPER' criticality = 'MEDIUM' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261012'
+                                          iv_runs = 15210 iv_as_of = '20261013' ) ) )
+        findings  = VALUE #( ( severity = 'LOW' ) )
+        callers   = VALUE #( ( criticality = 'HIGH' ) ) )
+      ( object_id = 'ZFI_OLD_LEDGER_EXPORT' criticality = 'LOW' findings_as_of = '20261013' )
+      ( object_id = 'ZMM_STOCK_ALERT' criticality = 'MEDIUM' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20260801' iv_end = '20261013' iv_last = '00000000'
+                                          iv_runs = 0 iv_as_of = '20261013' ) ) ) )
+      ( object_id = 'ZSD_CUST_CREDIT_CHECK' criticality = 'HIGH' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261010'
+                                          iv_runs = 930 iv_as_of = '20261013' ) ) )
+        findings  = VALUE #( ( severity = 'HIGH' ) ) )
+      ( object_id = 'ZCL_INVOICE_UTIL' criticality = 'UNKNOWN' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260930'
+                                          iv_runs = 41 iv_as_of = '20261013' ) ) )
+        callers   = VALUE #( ( criticality = 'HIGH' ) ) )
+      ( object_id = 'ZHR_PAYROLL_ADJ' criticality = 'UNKNOWN' findings_as_of = '20261013'
+        usages    = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20251212'
+                                          iv_runs = 3 iv_as_of = '20261013' ) ) ) ) ).
+  ENDMETHOD.
+
   METHOD evaluate.
     DATA(ls_ruleset) = is_ruleset.
     IF ls_ruleset IS INITIAL.
@@ -142,14 +181,12 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   " ================= paper tests T1 to T10 =================
 
   METHOD t01_no_use_12_months_retire.
-    " Boundary: exactly 12 whole months is enough.
     DATA(ls_result) = evaluate( unused_evidence( ) ).
     assert_result( is_result = ls_result iv_strategy = 'RETIRE_CANDIDATE'
                    it_matched = VALUE #( ( `R20` ) ) it_missing = VALUE #( ) iv_msg = 'T1' ).
   ENDMETHOD.
 
   METHOD t02_no_use_11_months_manual.
-    " Boundary: 2025-11-13 to 2026-10-13 is 11 whole months.
     DATA(ls_result) = evaluate( unused_evidence( iv_start = '20251113' ) ).
     assert_result( is_result = ls_result iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) )
@@ -157,7 +194,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t03_high_caller_no_match.
-    " A HIGH-criticality caller blocks R20; R30 and R60 need usage, so nothing matches.
     DATA(ls_evidence) = unused_evidence( ).
     ls_evidence-callers = VALUE #( ( criticality = 'HIGH' ) ).
     DATA(ls_result) = evaluate( ls_evidence ).
@@ -167,7 +203,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t04_used_zero_findings_keep.
-    " Boundary: zero findings, coverage known by findings_as_of.
     DATA(ls_result) = evaluate( used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ) ).
     assert_result( is_result = ls_result iv_strategy = 'KEEP_ADAPT'
                    it_matched = VALUE #( ( `R60` ) ) it_missing = VALUE #( ) iv_msg = 'T4' ).
@@ -190,7 +225,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t07_criticality_unknown_manual.
-    " R10 (priority 10) wins over R60 (priority 60), both match.
     DATA(ls_result) = evaluate( used_evidence( iv_criticality = 'UNKNOWN' ) ).
     assert_result( is_result = ls_result iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) ( `R60` ) )
@@ -198,7 +232,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t08_no_usage_row_manual.
-    " No data is not zero usage.
     DATA(ls_evidence) = unused_evidence( ).
     CLEAR ls_evidence-usages.
     DATA(ls_result) = evaluate( ls_evidence ).
@@ -208,7 +241,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t09_equal_priority_conflict.
-    " Test-only rule set: R61 shares priority 60 with R60 but gives a different outcome.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     APPEND VALUE #( rule_id = 'R61' priority = 60 active = abap_true
                     condition_code = zccmc_cl_rule_engine=>c_condition-used_without_high
@@ -223,7 +255,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t10_zero_runs_with_date_manual.
-    " Contradiction: run_count = 0 but last_executed is set. R20 also matches but R10 wins.
     DATA(ls_evidence) = unused_evidence( ).
     ls_evidence-usages[ 1 ]-last_executed = '20250925'.
     DATA(ls_result) = evaluate( ls_evidence ).
@@ -245,7 +276,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t12_period_end_before_start.
-    " The window check is skipped for an invalid period; only the contradiction is reported.
     DATA(ls_evidence) = used_evidence( ).
     ls_evidence-usages[ 1 ]-period_start = '20261013'.
     ls_evidence-usages[ 1 ]-period_end   = '20251013'.
@@ -256,7 +286,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t13_staleness_boundary.
-    " Evaluation date 2026-10-14. Exactly 30 days old is fresh; 31 days is stale.
     DATA(ls_fresh) = used_evidence( ).
     ls_fresh-usages[ 1 ]-evidence_as_of = '20260914'.
     assert_result( is_result = evaluate( ls_fresh ) iv_strategy = 'KEEP_ADAPT'
@@ -271,7 +300,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t14_findings_coverage_unknown.
-    " A blank findings_as_of means coverage is unknown: zero findings must not be inferred.
     DATA(ls_evidence) = used_evidence( ).
     CLEAR ls_evidence-findings_as_of.
     DATA(ls_result) = evaluate( ls_evidence ).
@@ -281,7 +309,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t15_multiple_usage_facts.
-    " PROPOSED behaviour: the engine does not pick one of several usage rows.
     DATA(ls_evidence) = used_evidence( ).
     APPEND usage_row( iv_start = '20240101' iv_end = '20241231' iv_last = '20241201'
                       iv_runs = 5 iv_as_of = '20261013' ) TO ls_evidence-usages.
@@ -292,7 +319,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t16_caller_criticality_unknown.
-    " PROPOSED behaviour. Unknown caller matters only on the retirement path.
     DATA(ls_unused) = unused_evidence( ).
     ls_unused-callers = VALUE #( ( criticality = 'UNKNOWN' ) ).
     assert_result( is_result = evaluate( ls_unused ) iv_strategy = 'MANUAL_REVIEW'
@@ -317,7 +343,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   " ================= rule-set behaviour =================
 
   METHOD t17_same_priority_same_outcome.
-    " Equal priority with the SAME outcome is not a conflict.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     APPEND VALUE #( rule_id = 'R62' priority = 60 active = abap_true
                     condition_code = zccmc_cl_rule_engine=>c_condition-used_without_high
@@ -330,7 +355,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t18_no_rule_matches.
-    " Rule set with R20 only; a used object matches nothing, so the safe default applies.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     DELETE ls_ruleset-rules WHERE rule_id <> 'R20'.
     DATA(ls_result) = evaluate( is_evidence = used_evidence( ) is_ruleset = ls_ruleset ).
@@ -340,7 +364,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t19_missing_r10_still_manual.
-    " Safety invariant: evidence problems give MANUAL_REVIEW even without rule R10.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     DELETE ls_ruleset-rules WHERE rule_id = 'R10'.
     DATA(ls_result) = evaluate( is_evidence = used_evidence( iv_criticality = 'UNKNOWN' )
@@ -363,7 +386,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t21_inactive_rule_is_ignored.
-    " Deactivating R60 leaves no matching rule for a used object.
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
     ls_ruleset-rules[ rule_id = 'R60' ]-active = abap_false.
     DATA(ls_result) = evaluate( is_evidence = used_evidence( ) is_ruleset = ls_ruleset ).
@@ -376,7 +398,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   " ================= details =================
 
   METHOD t22_info_and_medium_not_high.
-    " Only HIGH counts for R30. MEDIUM, LOW and INFO findings are ignored by the rules.
     DATA(ls_evidence) = used_evidence( ).
     ls_evidence-findings = VALUE #( ( severity = 'MEDIUM' ) ( severity = 'MEDIUM' )
                                     ( severity = 'LOW' ) ( severity = 'INFO' ) ).
@@ -414,10 +435,10 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
     ls_evidence-findings = VALUE #( ( severity = 'HIGH' ) ( severity = 'HIGH' ) ( severity = 'MEDIUM' ) ).
     DATA(ls_result) = evaluate( is_evidence = ls_evidence is_ruleset = ls_ruleset ).
 
-    cl_abap_unit_assert=>assert_equals( act = ls_result-object_id       exp = 'OBJ-USED' msg = 'object id passed through' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_result-run_id          exp = c_run_id   msg = 'run id passed through' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_result-ruleset_id      exp = ls_ruleset-ruleset_id msg = 'rule-set id recorded' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_result-ruleset_version exp = ls_ruleset-version    msg = 'rule-set version recorded' ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-object_id       exp = 'OBJ-USED'   msg = 'object id passed through' ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-run_id          exp = c_run_id     msg = 'run id passed through' ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-ruleset_id      exp = 'ZCCMC_DEMO' msg = 'v1 rule-set id recorded' ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-ruleset_version exp = '1.0.0'      msg = 'v1 rule-set version recorded' ).
     cl_abap_unit_assert=>assert_char_cp( act = ls_result-explanation exp = '*R30*'
                                          msg = 'explanation names the matched rule' ).
     cl_abap_unit_assert=>assert_char_cp( act = ls_result-explanation exp = '*high_findings=2*'
@@ -427,7 +448,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_np( act = ls_result-explanation exp = '*RUN-0001*'
                                          msg = 'explanation never contains the run id' ).
 
-    " Evidence problem: explanation lists the reason codes.
     DATA(ls_missing) = evaluate( used_evidence( iv_criticality = 'UNKNOWN' ) ).
     cl_abap_unit_assert=>assert_char_cp( act = ls_missing-explanation exp = '*CRITICALITY_UNKNOWN*'
                                          msg = 'explanation lists the missing-evidence code' ).
@@ -437,7 +457,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   " ================= determinism and permutation =================
 
   METHOD t25_repeat_run_is_identical.
-    " Two runs with different run ids: only run id may differ.
     DATA(ls_evidence) = used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ).
     ls_evidence-findings = VALUE #( ( severity = 'HIGH' ) ( severity = 'LOW' ) ).
     DATA(ls_ruleset) = zccmc_cl_rule_engine=>seed_ruleset( ).
@@ -452,7 +471,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t26_row_order_does_not_matter.
-    " Reverse findings, callers and usage rows, and reverse the rule rows.
     DATA(ls_evidence) = used_evidence( iv_criticality = 'HIGH' iv_runs = 2480 ).
     ls_evidence-findings = VALUE #( ( severity = 'LOW' ) ( severity = 'HIGH' ) ( severity = 'MEDIUM' ) ( severity = 'HIGH' ) ).
     ls_evidence-callers  = VALUE #( ( criticality = 'LOW' ) ( criticality = 'UNKNOWN' ) ( criticality = 'HIGH' ) ).
@@ -481,7 +499,6 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = ls_b exp = ls_a
                                         msg = 'row order must not change the result' ).
 
-    " Two usage rows (multiple-usage case) in both orders.
     DATA(ls_two) = used_evidence( ).
     APPEND usage_row( iv_start = '20240101' iv_end = '20241231' iv_last = '20241201'
                       iv_runs = 5 iv_as_of = '20261013' ) TO ls_two-usages.
@@ -493,70 +510,134 @@ CLASS zccmc_ut_rule_engine IMPLEMENTATION.
 
 
   " ================= the 7 synthetic sample objects =================
-  " Source: data/sample-synthetic/*.csv on main (candidate contract
-  " v0.2, findings_as_of = 2026-10-13 on every object), evaluation date 2026-10-14.
-  " Expected values: docs/m2-golden-results.md. Inbound callers: ZCL_PRICING_HELPER is called
-  " by ZSD_OPEN_ORDERS_RPT (HIGH) and ZCL_INVOICE_UTIL by ZSD_CUST_CREDIT_CHECK (HIGH).
 
   METHOD t27_sample_objects_golden.
-    DATA ls_e TYPE zccmc_cl_rule_engine=>ty_evidence.
+    DATA(lt_ev) = sample_evidence_tab( ).
 
-    " 1 ZSD_OPEN_ORDERS_RPT: HIGH, 2480 runs, 2 HIGH + 4 MEDIUM findings
-    ls_e = VALUE #( object_id = 'ZSD_OPEN_ORDERS_RPT' criticality = 'HIGH' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260925'
-                                                     iv_runs = 2480 iv_as_of = '20261013' ) ) )
-                    findings = VALUE #( ( severity = 'HIGH' ) ( severity = 'HIGH' ) ( severity = 'MEDIUM' )
-                                        ( severity = 'MEDIUM' ) ( severity = 'MEDIUM' ) ( severity = 'MEDIUM' ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
-                   it_matched = VALUE #( ( `R30` ) ) it_missing = VALUE #( ) iv_msg = 'ZSD_OPEN_ORDERS_RPT' ).
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZSD_OPEN_ORDERS_RPT' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
+                   it_matched = VALUE #( ( `R30` ) ) it_missing = VALUE #( )
+                   iv_msg = 'ZSD_OPEN_ORDERS_RPT' ).
 
-    " 2 ZCL_PRICING_HELPER: MEDIUM, 15210 runs, 1 LOW finding, called by a HIGH object
-    ls_e = VALUE #( object_id = 'ZCL_PRICING_HELPER' criticality = 'MEDIUM' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261012'
-                                                     iv_runs = 15210 iv_as_of = '20261013' ) ) )
-                    findings = VALUE #( ( severity = 'LOW' ) )
-                    callers  = VALUE #( ( criticality = 'HIGH' ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'KEEP_ADAPT'
-                   it_matched = VALUE #( ( `R60` ) ) it_missing = VALUE #( ) iv_msg = 'ZCL_PRICING_HELPER' ).
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZCL_PRICING_HELPER' ] )
+                   iv_strategy = 'KEEP_ADAPT'
+                   it_matched = VALUE #( ( `R60` ) ) it_missing = VALUE #( )
+                   iv_msg = 'ZCL_PRICING_HELPER' ).
 
-    " 3 ZFI_OLD_LEDGER_EXPORT: LOW, no usage row, no findings (coverage known)
-    ls_e = VALUE #( object_id = 'ZFI_OLD_LEDGER_EXPORT' criticality = 'LOW' findings_as_of = '20261013' ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZFI_OLD_LEDGER_EXPORT' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) )
-                   it_missing = VALUE #( ( `NO_USAGE_FACT` ) ) iv_msg = 'ZFI_OLD_LEDGER_EXPORT' ).
+                   it_missing = VALUE #( ( `NO_USAGE_FACT` ) )
+                   iv_msg = 'ZFI_OLD_LEDGER_EXPORT' ).
 
-    " 4 ZMM_STOCK_ALERT: MEDIUM, 0 runs, window 2026-08-01 to 2026-10-13 (2 whole months)
-    ls_e = VALUE #( object_id = 'ZMM_STOCK_ALERT' criticality = 'MEDIUM' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20260801' iv_end = '20261013' iv_last = '00000000'
-                                                     iv_runs = 0 iv_as_of = '20261013' ) ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZMM_STOCK_ALERT' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) )
-                   it_missing = VALUE #( ( `WINDOW_TOO_SHORT` ) ) iv_msg = 'ZMM_STOCK_ALERT' ).
+                   it_missing = VALUE #( ( `WINDOW_TOO_SHORT` ) )
+                   iv_msg = 'ZMM_STOCK_ALERT' ).
 
-    " 5 ZSD_CUST_CREDIT_CHECK: HIGH, 930 runs, 1 HIGH finding
-    ls_e = VALUE #( object_id = 'ZSD_CUST_CREDIT_CHECK' criticality = 'HIGH' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261010'
-                                                     iv_runs = 930 iv_as_of = '20261013' ) ) )
-                    findings = VALUE #( ( severity = 'HIGH' ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
-                   it_matched = VALUE #( ( `R30` ) ) it_missing = VALUE #( ) iv_msg = 'ZSD_CUST_CREDIT_CHECK' ).
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZSD_CUST_CREDIT_CHECK' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
+                   it_matched = VALUE #( ( `R30` ) ) it_missing = VALUE #( )
+                   iv_msg = 'ZSD_CUST_CREDIT_CHECK' ).
 
-    " 6 ZCL_INVOICE_UTIL: criticality UNKNOWN, 41 runs, no findings, called by a HIGH object
-    ls_e = VALUE #( object_id = 'ZCL_INVOICE_UTIL' criticality = 'UNKNOWN' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260930'
-                                                     iv_runs = 41 iv_as_of = '20261013' ) ) )
-                    callers  = VALUE #( ( criticality = 'HIGH' ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZCL_INVOICE_UTIL' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) ( `R60` ) )
-                   it_missing = VALUE #( ( `CRITICALITY_UNKNOWN` ) ) iv_msg = 'ZCL_INVOICE_UTIL' ).
+                   it_missing = VALUE #( ( `CRITICALITY_UNKNOWN` ) )
+                   iv_msg = 'ZCL_INVOICE_UTIL' ).
 
-    " 7 ZHR_PAYROLL_ADJ: criticality UNKNOWN, 3 runs, last executed 2025-12-12, no findings
-    ls_e = VALUE #( object_id = 'ZHR_PAYROLL_ADJ' criticality = 'UNKNOWN' findings_as_of = '20261013'
-                    usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20251212'
-                                                     iv_runs = 3 iv_as_of = '20261013' ) ) ) ).
-    assert_result( is_result = evaluate( ls_e ) iv_strategy = 'MANUAL_REVIEW'
+    assert_result( is_result = evaluate( lt_ev[ object_id = 'ZHR_PAYROLL_ADJ' ] )
+                   iv_strategy = 'MANUAL_REVIEW'
                    it_matched = VALUE #( ( `R10` ) ( `R60` ) )
-                   it_missing = VALUE #( ( `CRITICALITY_UNKNOWN` ) ) iv_msg = 'ZHR_PAYROLL_ADJ' ).
+                   it_missing = VALUE #( ( `CRITICALITY_UNKNOWN` ) )
+                   iv_msg = 'ZHR_PAYROLL_ADJ' ).
+  ENDMETHOD.
+
+
+  " ================= Day 8-11: portfolio permutation, isolation, edge fixtures & M1 bridge =================
+
+  METHOD t28_portfolio_batch_and_perm.
+    DATA(lt_forward) = sample_evidence_tab( ).
+    DATA lt_reverse  TYPE zccmc_cl_rule_engine=>ty_evidence_tab.
+    DATA(lv_idx) = lines( lt_forward ).
+    WHILE lv_idx > 0.
+      APPEND lt_forward[ lv_idx ] TO lt_reverse.
+      lv_idx = lv_idx - 1.
+    ENDWHILE.
+
+    DATA(lt_run1) = zccmc_cl_rule_engine=>evaluate_portfolio(
+                      it_evidence        = lt_forward
+                      iv_evaluation_date = c_eval_date
+                      iv_run_id          = c_run_id ).
+    DATA(lt_run2) = zccmc_cl_rule_engine=>evaluate_portfolio(
+                      it_evidence        = lt_forward
+                      iv_evaluation_date = c_eval_date
+                      iv_run_id          = c_run_id ).
+    DATA(lt_perm) = zccmc_cl_rule_engine=>evaluate_portfolio(
+                      it_evidence        = lt_reverse
+                      iv_evaluation_date = c_eval_date
+                      iv_run_id          = c_run_id ).
+
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_run1 ) exp = 7 msg = 'T28: 7 objects evaluated' ).
+    cl_abap_unit_assert=>assert_equals( act = lt_run2          exp = lt_run1 msg = 'T28: two clean runs identical' ).
+    cl_abap_unit_assert=>assert_equals( act = lt_perm          exp = lt_run1 msg = 'T28: permuted input order identical' ).
+    cl_abap_unit_assert=>assert_equals( act = lt_run1[ 1 ]-object_id exp = 'ZCL_INVOICE_UTIL'
+                                        msg = 'T28: portfolio output sorted by object_id' ).
+  ENDMETHOD.
+
+  METHOD t29_no_cross_object_leakage.
+    DATA(lt_batch) = sample_evidence_tab( ).
+    DATA(lt_results) = zccmc_cl_rule_engine=>evaluate_portfolio(
+                         it_evidence        = lt_batch
+                         iv_evaluation_date = c_eval_date
+                         iv_run_id          = c_run_id ).
+
+    DATA(ls_standalone) = evaluate( lt_batch[ object_id = 'ZCL_PRICING_HELPER' ] ).
+    DATA(ls_in_batch)   = lt_results[ object_id = 'ZCL_PRICING_HELPER' ].
+
+    cl_abap_unit_assert=>assert_equals( act = ls_in_batch exp = ls_standalone
+                                        msg = 'T29: batch result must equal standalone result' ).
+    cl_abap_unit_assert=>assert_char_np( act = ls_in_batch-explanation exp = '*CRITICALITY_UNKNOWN*'
+                                         msg = 'T29: no missing-evidence leakage from ZCL_INVOICE_UTIL' ).
+    cl_abap_unit_assert=>assert_char_np( act = ls_in_batch-explanation exp = '*NO_USAGE_FACT*'
+                                         msg = 'T29: no missing-evidence leakage from ZFI_OLD_LEDGER_EXPORT' ).
+    cl_abap_unit_assert=>assert_char_np( act = ls_in_batch-explanation exp = '*high_findings=2*'
+                                         msg = 'T29: no finding count leakage from ZSD_OPEN_ORDERS_RPT' ).
+  ENDMETHOD.
+
+  METHOD t30_edge_and_corrected_fixtures.
+    DATA(lt_ev) = sample_evidence_tab( ).
+    DATA(ls_base_zsd) = lt_ev[ object_id = 'ZSD_OPEN_ORDERS_RPT' ].
+    DATA(ls_res_base) = evaluate( ls_base_zsd ).
+
+    DATA(ls_corrected_zsd) = ls_base_zsd.
+    DATA(ls_res_corrected) = evaluate( ls_corrected_zsd ).
+    cl_abap_unit_assert=>assert_equals( act = ls_res_corrected exp = ls_res_base
+                                        msg = 'T30: corrected object description does not alter rule result' ).
+
+    DATA(ls_quoted_zsd) = ls_base_zsd.
+    APPEND VALUE #( severity = 'LOW' ) TO ls_quoted_zsd-findings.
+    DATA(ls_res_quoted) = evaluate( ls_quoted_zsd ).
+    cl_abap_unit_assert=>assert_equals( act = ls_res_quoted exp = ls_res_base
+                                        msg = 'T30: quoted LOW finding F900 does not alter HIGH finding count or R30 result' ).
+  ENDMETHOD.
+
+  METHOD t31_m1_import_evidence_bridge.
+    " Verifies build_evidence_from_import bridge aligned with zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj.
+    DATA(ls_ev) = zccmc_cl_rule_engine=>build_evidence_from_import(
+                    iv_object_id      = ' zcl_pricing_helper '
+                    iv_criticality    = ' medium '
+                    iv_findings_as_of = '20261013'
+                    it_usages         = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013'
+                                                              iv_last  = '20261012' iv_runs = 15210
+                                                              iv_as_of = '20261013' ) ) )
+                    it_findings       = VALUE #( ( severity = ' low ' ) )
+                    it_callers        = VALUE #( ( criticality = ' high ' ) ) ).
+    DATA(ls_res) = evaluate( ls_ev ).
+    assert_result( is_result = ls_res iv_strategy = 'KEEP_ADAPT'
+                   it_matched = VALUE #( ( `R60` ) ) it_missing = VALUE #( )
+                   iv_msg = 'T31 M1->M2 evidence bridge' ).
   ENDMETHOD.
 
 ENDCLASS.

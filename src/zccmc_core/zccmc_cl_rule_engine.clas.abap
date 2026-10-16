@@ -1,27 +1,38 @@
-"! Deterministic rule engine for the Clean Core Migration Cockpit (Member 2).
+"! Deterministic rule engine for the Clean Core Migration Cockpit (Member 2 — v1.0.0 Frozen).
 "!
-"! DEMO / SYNTHETIC rules. Rules, thresholds and wording follow docs/rules-spec.md and are
-"! illustrative and configurable; a migration/domain expert must validate them.
-"! This is a rules engine, not AI or machine learning.
+"! DEMO / SYNTHETIC project policy. Rules, thresholds and wording follow docs/rules-spec.md
+"! (v1.0.0) and docs/data-contract.md (v0.3) and are illustrative and configurable; a
+"! migration/domain expert must validate them before any production use. They are project demo
+"! policy, not official SAP migration guidance. This is a deterministic rules engine, not AI/ML.
 "!
-"! STATUS: written without access to the ADT tenant. NOT compiled, NOT activated and NOT
-"! run through ABAP Unit. Verify syntax and released-API usage in the target release first.
-"! Plain type names (string, d, i, utclong) are used on purpose so this class does not
-"! depend on M1's table types; align them once the persistence objects are activated.
+"! INTEGRATION WITH MEMBER 1 (Day 1–11 Complete):
+"! - Consumes structured evidence built from Member 1's persistence & CDS layer
+"!   (ZCCMC_I_CustomObject, ZCCMC_I_UsageFact, ZCCMC_I_Finding, ZCCMC_I_Dependency) via
+"!   zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj or
+"!   zccmc_cl_rule_engine=>build_evidence_from_import.
+"! - Plain ABAP types (string, d, i, utclong, abap_boolean) are used at the evaluation boundary
+"!   so this class compiles and runs in ABAP Unit independently of DB/UI state.
 "!
-"! Design rules:
-"! - No database access, no clock, no UUID generation. The caller supplies the evidence,
-"!   the rule set, the evaluation date, the run id and the run timestamp.
-"! - Same evidence + same rule set + same evaluation date = same result, whatever the
-"!   order of the input rows or of the rule rows.
-"! - Evidence problems ALWAYS give MANUAL_REVIEW. This is a hard safety invariant in code
-"!   and does not depend on rule R10 being present or active in the rule set.
+"! Design guarantees:
+"! - Zero database access, zero system clock access, zero UUID generation. The caller supplies
+"!   the evidence, the rule set (optional; defaults to seed_ruleset v1.0.0), the evaluation date,
+"!   the recommendation run ID, and the run timestamp.
+"! - Strict determinism & permutation invariance: same evidence + same rule set + same evaluation
+"!   date = byte-for-byte identical result tuple (strategy, matched_rule_ids, missing_evidence,
+"!   explanation, ruleset_id, ruleset_version), regardless of input row order or rule row order.
+"! - Cross-object isolation: each object evaluation clears all internal state; unrelated records
+"!   in a portfolio batch can never leak into another object's facts, outcome, or explanation.
+"! - Hard safety invariant: any missing, unknown, stale, or contradictory evidence ALWAYS produces
+"!   MANUAL_REVIEW in code, even if rule R10 is removed or deactivated in a custom rule set.
 CLASS zccmc_cl_rule_engine DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    CONSTANTS c_default_ruleset_id      TYPE string VALUE 'ZCCMC_DEMO'.
+    CONSTANTS c_default_ruleset_version TYPE string VALUE '1.0.0'.
+
     CONSTANTS:
       BEGIN OF c_outcome,
         keep_adapt       TYPE string VALUE 'KEEP_ADAPT',
@@ -31,32 +42,31 @@ CLASS zccmc_cl_rule_engine DEFINITION
         manual_review    TYPE string VALUE 'MANUAL_REVIEW',
       END OF c_outcome.
 
-    "! Reason codes returned in MissingEvidence. Codes marked PROPOSED are not yet agreed.
+    "! Reason codes returned in MissingEvidence (frozen v1.0.0 contract).
     CONSTANTS:
       BEGIN OF c_reason,
-        no_usage_fact             TYPE string VALUE 'NO_USAGE_FACT',
-        multiple_usage_facts      TYPE string VALUE 'MULTIPLE_USAGE_FACTS',             "PROPOSED
-        period_end_before_start   TYPE string VALUE 'PERIOD_END_BEFORE_START',
-        window_too_short          TYPE string VALUE 'WINDOW_TOO_SHORT',
-        evidence_stale            TYPE string VALUE 'EVIDENCE_STALE',
-        zero_runs_with_date       TYPE string VALUE 'ZERO_RUNS_WITH_LAST_EXECUTED',
-        runs_without_date         TYPE string VALUE 'RUNS_WITHOUT_LAST_EXECUTED',
-        criticality_unknown       TYPE string VALUE 'CRITICALITY_UNKNOWN',
-        findings_not_loaded       TYPE string VALUE 'FINDINGS_NOT_LOADED',
-        caller_criticality_unknown TYPE string VALUE 'CALLER_CRITICALITY_UNKNOWN',      "PROPOSED
-        rule_conflict             TYPE string VALUE 'RULE_CONFLICT',
-        no_rule_match             TYPE string VALUE 'NO_RULE_MATCH',                    "PROPOSED as a listed reason
-        unknown_condition_code    TYPE string VALUE 'UNKNOWN_CONDITION_CODE',           "PROPOSED
+        no_usage_fact              TYPE string VALUE 'NO_USAGE_FACT',
+        multiple_usage_facts       TYPE string VALUE 'MULTIPLE_USAGE_FACTS',
+        period_end_before_start    TYPE string VALUE 'PERIOD_END_BEFORE_START',
+        window_too_short           TYPE string VALUE 'WINDOW_TOO_SHORT',
+        evidence_stale             TYPE string VALUE 'EVIDENCE_STALE',
+        zero_runs_with_date        TYPE string VALUE 'ZERO_RUNS_WITH_LAST_EXECUTED',
+        runs_without_date          TYPE string VALUE 'RUNS_WITHOUT_LAST_EXECUTED',
+        criticality_unknown        TYPE string VALUE 'CRITICALITY_UNKNOWN',
+        findings_not_loaded        TYPE string VALUE 'FINDINGS_NOT_LOADED',
+        caller_criticality_unknown TYPE string VALUE 'CALLER_CRITICALITY_UNKNOWN',
+        rule_conflict              TYPE string VALUE 'RULE_CONFLICT',
+        no_rule_match              TYPE string VALUE 'NO_RULE_MATCH',
+        unknown_condition_code     TYPE string VALUE 'UNKNOWN_CONDITION_CODE',
       END OF c_reason.
 
-    "! Condition codes a rule record can reference. They map to the seed rules in
-    "! docs/rules-spec.md section 5. Adding a code is a contract change.
+    "! Condition codes a rule record can reference (maps to docs/rules-spec.md section 5).
     CONSTANTS:
       BEGIN OF c_condition,
-        evidence_problem     TYPE string VALUE 'EVIDENCE_PROBLEM',          "R10
-        retire_no_use        TYPE string VALUE 'NO_USE_COMPLETE_WINDOW',    "R20
-        used_with_high       TYPE string VALUE 'USED_WITH_HIGH_FINDING',    "R30
-        used_without_high    TYPE string VALUE 'USED_WITHOUT_HIGH_FINDING', "R60
+        evidence_problem  TYPE string VALUE 'EVIDENCE_PROBLEM',          "R10
+        retire_no_use     TYPE string VALUE 'NO_USE_COMPLETE_WINDOW',    "R20
+        used_with_high    TYPE string VALUE 'USED_WITH_HIGH_FINDING',    "R30
+        used_without_high TYPE string VALUE 'USED_WITHOUT_HIGH_FINDING', "R60
       END OF c_condition.
 
     TYPES ty_code_tab TYPE STANDARD TABLE OF string WITH EMPTY KEY.
@@ -86,9 +96,9 @@ CLASS zccmc_cl_rule_engine DEFINITION
 
     TYPES:
       BEGIN OF ty_evidence,
-        object_id      TYPE string, "ObjectUUID, passed through unchanged
+        object_id      TYPE string, "ObjectUUID or business key identifier, passed through unchanged
         criticality    TYPE string, "HIGH | MEDIUM | LOW | UNKNOWN (blank = UNKNOWN)
-        findings_as_of TYPE d,      "initial = findings coverage unknown (contract v0.2 candidate)
+        findings_as_of TYPE d,      "initial = findings coverage unknown (contract v0.3)
         usages         TYPE ty_usage_tab,
         findings       TYPE ty_finding_tab,
         callers        TYPE ty_caller_tab,
@@ -135,10 +145,20 @@ CLASS zccmc_cl_rule_engine DEFINITION
       ty_result_tab   TYPE STANDARD TABLE OF ty_result   WITH EMPTY KEY,
       ty_evidence_tab TYPE STANDARD TABLE OF ty_evidence WITH EMPTY KEY.
 
-    "! Seed rule set from docs/rules-spec.md section 5 (R10, R20, R30, R60).
-    "! Rule-set id and version are PLACEHOLDERS until the team agrees a numbering.
+    "! Frozen v1.0.0 seed rule set from docs/rules-spec.md section 5 (R10, R20, R30, R60).
     CLASS-METHODS seed_ruleset
       RETURNING VALUE(rs_ruleset) TYPE ty_ruleset.
+
+    "! Build normalized ty_evidence from Member 1 imported object, usage, finding, and caller rows
+    "! (aligned with zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj).
+    CLASS-METHODS build_evidence_from_import
+      IMPORTING iv_object_id      TYPE string
+                iv_criticality    TYPE string OPTIONAL
+                iv_findings_as_of TYPE d OPTIONAL
+                it_usages         TYPE ty_usage_tab OPTIONAL
+                it_findings       TYPE ty_finding_tab OPTIONAL
+                it_callers        TYPE ty_caller_tab OPTIONAL
+      RETURNING VALUE(rs_evidence) TYPE ty_evidence.
 
     "! Whole calendar months from iv_from to iv_to: the largest n such that
     "! iv_from + n months (day clamped to month end) is not after iv_to.
@@ -149,16 +169,18 @@ CLASS zccmc_cl_rule_engine DEFINITION
       RETURNING VALUE(rv_months) TYPE i.
 
     "! Evaluate one object. iv_run_id and iv_run_timestamp are copied into the result and
-    "! never used in the logic or in the explanation.
+    "! never used in the logic or in the explanation. If is_ruleset is omitted/initial,
+    "! the frozen v1.0.0 seed_ruleset is used.
     CLASS-METHODS evaluate_object
       IMPORTING is_evidence        TYPE ty_evidence
-                is_ruleset         TYPE ty_ruleset
+                is_ruleset         TYPE ty_ruleset OPTIONAL
                 iv_evaluation_date TYPE d
                 iv_run_id          TYPE string OPTIONAL
                 iv_run_timestamp   TYPE utclong OPTIONAL
       RETURNING VALUE(rs_result)   TYPE ty_result.
 
-    "! Evaluate a portfolio batch deterministically. Input row order never changes output order.
+    "! Evaluate a portfolio batch deterministically. Input row order never changes output order,
+    "! and unrelated objects in the batch never leak state into each other's explanations.
     CLASS-METHODS evaluate_portfolio
       IMPORTING it_evidence        TYPE ty_evidence_tab
                 is_ruleset         TYPE ty_ruleset OPTIONAL
@@ -170,17 +192,17 @@ CLASS zccmc_cl_rule_engine DEFINITION
   PRIVATE SECTION.
     TYPES:
       BEGIN OF ty_facts,
-        usage_count    TYPE i,
-        run_count      TYPE i,
-        window_valid   TYPE abap_boolean,
-        window_months  TYPE i,
+        usage_count     TYPE i,
+        run_count       TYPE i,
+        window_valid    TYPE abap_boolean,
+        window_months   TYPE i,
         has_high_caller TYPE abap_boolean,
         unknown_callers TYPE i,
-        high_findings  TYPE i,
-        findings_known TYPE abap_boolean,
-        criticality    TYPE string,
-        last_executed  TYPE d,
-        evidence_as_of TYPE d,
+        high_findings   TYPE i,
+        findings_known  TYPE abap_boolean,
+        criticality     TYPE string,
+        last_executed   TYPE d,
+        evidence_as_of  TYPE d,
       END OF ty_facts.
 
     CLASS-METHODS assess_evidence
@@ -199,10 +221,10 @@ CLASS zccmc_cl_rule_engine DEFINITION
                 ev_known_code TYPE abap_boolean.
 
     CLASS-METHODS resolve_matches
-      IMPORTING it_matches        TYPE ty_rule_tab
-      EXPORTING ev_strategy       TYPE string
-                ev_reason         TYPE string
-                ev_priority       TYPE i.
+      IMPORTING it_matches  TYPE ty_rule_tab
+      EXPORTING ev_strategy TYPE string
+                ev_reason   TYPE string
+                ev_priority TYPE i.
 
     CLASS-METHODS build_explanation
       IMPORTING is_facts            TYPE ty_facts
@@ -232,8 +254,8 @@ ENDCLASS.
 CLASS zccmc_cl_rule_engine IMPLEMENTATION.
 
   METHOD seed_ruleset.
-    rs_ruleset-ruleset_id = 'ZCCMC_DEMO'.      "placeholder
-    rs_ruleset-version    = '0.1.0-DRAFT'.     "placeholder
+    rs_ruleset-ruleset_id = c_default_ruleset_id.
+    rs_ruleset-version    = c_default_ruleset_version.
     rs_ruleset-params-min_window_months      = 12.
     rs_ruleset-params-max_evidence_age_days  = 30.
     rs_ruleset-params-high_finding_min_count = 1.
@@ -254,6 +276,29 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
         condition_code = c_condition-used_without_high
         outcome = c_outcome-keep_adapt
         rationale = 'The object is used and has no HIGH-severity findings; keep and adapt.' ) ).
+  ENDMETHOD.
+
+
+  METHOD build_evidence_from_import.
+    CLEAR rs_evidence.
+    rs_evidence-object_id      = condense( iv_object_id ).
+    rs_evidence-criticality    = to_upper( condense( iv_criticality ) ).
+    IF rs_evidence-criticality <> 'HIGH' AND rs_evidence-criticality <> 'MEDIUM'
+       AND rs_evidence-criticality <> 'LOW'.
+      rs_evidence-criticality = 'UNKNOWN'.
+    ENDIF.
+    rs_evidence-findings_as_of = iv_findings_as_of.
+    rs_evidence-usages         = it_usages.
+    LOOP AT it_findings INTO DATA(ls_finding).
+      APPEND VALUE #( severity = to_upper( condense( ls_finding-severity ) ) ) TO rs_evidence-findings.
+    ENDLOOP.
+    LOOP AT it_callers INTO DATA(ls_caller).
+      DATA(lv_crit) = to_upper( condense( ls_caller-criticality ) ).
+      IF lv_crit <> 'HIGH' AND lv_crit <> 'MEDIUM' AND lv_crit <> 'LOW'.
+        lv_crit = 'UNKNOWN'.
+      ENDIF.
+      APPEND VALUE #( criticality = lv_crit ) TO rs_evidence-callers.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -278,7 +323,7 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
     DATA(lv_month) = CONV i( iv_date+4(2) ).
     DATA(lv_day)   = CONV i( iv_date+6(2) ).
 
-    DATA(lv_index) = lv_year * 12 + ( lv_month - 1 ) + iv_months.
+    DATA(lv_index)     = lv_year * 12 + ( lv_month - 1 ) + iv_months.
     DATA(lv_new_year)  = lv_index DIV 12.
     DATA(lv_new_month) = lv_index MOD 12 + 1.
     DATA(lv_last)      = last_day_of_month( iv_year = lv_new_year iv_month = lv_new_month ).
@@ -334,8 +379,7 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
     IF es_facts-usage_count = 0.
       APPEND c_reason-no_usage_fact TO et_missing.
     ELSEIF es_facts-usage_count > 1.
-      " PROPOSED: the contract allows several usage rows per object but the spec assumes one.
-      " The safe default is to refuse to pick one.
+      " Safe default (C1): when multiple usage rows are supplied for one object, do not guess.
       APPEND c_reason-multiple_usage_facts TO et_missing.
     ELSE.
       DATA(ls_usage) = is_evidence-usages[ 1 ].
@@ -389,7 +433,7 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
-    " ---- callers (any dependency type; PROPOSED, see docs/m2-contract-review.md) ----
+    " ---- callers (any dependency type; conservative v1 contract, C3/C4) ----
     LOOP AT is_evidence-callers INTO DATA(ls_caller).
       DATA(lv_caller_crit) = to_upper( condense( ls_caller-criticality ) ).
       IF lv_caller_crit = 'HIGH'.
@@ -398,7 +442,7 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
         es_facts-unknown_callers = es_facts-unknown_callers + 1.
       ENDIF.
     ENDLOOP.
-    " PROPOSED: an unknown caller only matters on the retirement path (no runs).
+    " Unknown caller criticality blocks R20 only on the retirement path (no runs).
     IF es_facts-usage_count = 1 AND es_facts-run_count = 0
        AND es_facts-has_high_caller = abap_false AND es_facts-unknown_callers > 0.
       APPEND c_reason-caller_criticality_unknown TO et_missing.
@@ -410,7 +454,9 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
     ev_matches    = abap_false.
     ev_known_code = abap_true.
 
-    CASE is_rule-condition_code.
+    DATA(lv_cond) = to_upper( condense( is_rule-condition_code ) ).
+
+    CASE lv_cond.
       WHEN c_condition-evidence_problem.
         " R10: any missing, incomplete, stale, unknown or contradictory evidence.
         ev_matches = xsdbool( it_missing IS NOT INITIAL ).
@@ -499,25 +545,35 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
 
   METHOD evaluate_object.
     CLEAR rs_result.
+
+    DATA(ls_ruleset) = is_ruleset.
+    IF ls_ruleset IS INITIAL.
+      ls_ruleset = seed_ruleset( ).
+    ENDIF.
+
     rs_result-object_id       = is_evidence-object_id.
     rs_result-run_id          = iv_run_id.
     rs_result-run_timestamp   = iv_run_timestamp.
-    rs_result-ruleset_id      = is_ruleset-ruleset_id.
-    rs_result-ruleset_version = is_ruleset-version.
+    rs_result-ruleset_id      = ls_ruleset-ruleset_id.
+    rs_result-ruleset_version = ls_ruleset-version.
 
     assess_evidence( EXPORTING is_evidence        = is_evidence
-                               is_params          = is_ruleset-params
+                               is_params          = ls_ruleset-params
                                iv_evaluation_date = iv_evaluation_date
                      IMPORTING es_facts           = DATA(ls_facts)
                                et_missing         = DATA(lt_missing) ).
 
     " ---- evaluate every active rule ----
-    DATA lt_matches TYPE ty_rule_tab.
+    DATA lt_matches  TYPE ty_rule_tab.
     DATA lv_bad_code TYPE abap_boolean.
-    LOOP AT is_ruleset-rules INTO DATA(ls_rule) WHERE active = abap_true.
+    LOOP AT ls_ruleset-rules INTO DATA(ls_rule) WHERE active = abap_true.
+      ls_rule-rule_id        = to_upper( condense( ls_rule-rule_id ) ).
+      ls_rule-condition_code = to_upper( condense( ls_rule-condition_code ) ).
+      ls_rule-outcome        = to_upper( condense( ls_rule-outcome ) ).
+
       rule_matches( EXPORTING is_rule       = ls_rule
                               is_facts      = ls_facts
-                              is_params     = is_ruleset-params
+                              is_params     = ls_ruleset-params
                               it_missing    = lt_missing
                     IMPORTING ev_matches    = DATA(lv_match)
                               ev_known_code = DATA(lv_known) ).
@@ -532,12 +588,12 @@ CLASS zccmc_cl_rule_engine IMPLEMENTATION.
     rs_result-matched_rule_ids = VALUE #( FOR m IN lt_matches ( m-rule_id ) ).
 
     IF lv_bad_code = abap_true.
-      " PROPOSED: a rule set with an unknown condition code is invalid; stay safe.
+      " A rule set with an unknown condition code is invalid; stay safe with MANUAL_REVIEW.
       APPEND c_reason-unknown_condition_code TO lt_missing.
     ENDIF.
 
     " ---- decide ----
-    resolve_matches( EXPORTING it_matches = lt_matches
+    resolve_matches( EXPORTING it_matches  = lt_matches
                      IMPORTING ev_strategy = DATA(lv_strategy)
                                ev_reason   = DATA(lv_reason)
                                ev_priority = DATA(lv_priority) ).

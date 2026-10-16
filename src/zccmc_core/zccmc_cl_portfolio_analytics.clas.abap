@@ -1,29 +1,35 @@
-"! Portfolio analytics service for the Clean Core Migration Cockpit (Member 2 - Day 6).
+"! Portfolio analytics service for the Clean Core Migration Cockpit (Member 2 — v1.0.0 Frozen).
 "!
-"! Computes the deterministic portfolio metrics documented in docs/rules-spec.md section 12:
+"! Computes the deterministic portfolio metrics documented in docs/rules-spec.md section 10:
 "! - M-01: Total objects evaluated in the latest recommendation run.
-"! - M-02: Objects grouped by RecommendedStrategy (all 5 outcomes represented).
+"! - M-02: Objects grouped by RecommendedStrategy (strictly the 5 frozen outcomes).
 "! - M-03: Objects with non-empty MissingEvidence (unresolved inputs) and breakdown by reason code.
-"! - Additional groupings for UI filters: by source_system, package, and criticality.
+"! - Additional groupings for Portfolio Overview UI filters: by source_system, package, and criticality.
 "!
-"! STATUS: the metrics M-01 to M-03 are still PROPOSED in rules-spec section 12 until the
-"! team agrees them. The extra groupings (source system, package, criticality) are not in
-"! that section and are not agreed. Not yet compiled or run in ABAP Unit.
-"!
-"! Design guarantees:
-"! - Plain ABAP types (string, i, utclong, abap_boolean) with zero DB/UI coupling so this class
-"!   compiles and runs in ABAP Unit independently of Member 1 tables or Member 3 RAP views.
-"! - Anti-double-counting: deduplicates inputs by normalized (source_system, object_type, object_name)
-"!   or object_id, keeping only the latest run (by run_timestamp, then run_id) per object. Naive 1:N
-"!   joins to usage, findings or dependencies can never inflate object or strategy counts.
-"! - Reconcile invariant: total_objects = sum(by_strategy-object_count)
-"!                        = objects_with_complete_evidence + objects_with_missing_evidence.
+"! INTEGRATION WITH MEMBER 1 (Day 1–11 Complete):
+"! - Consumes object metadata from Member 1's ZCCMC_CUSTOBJ / ZCCMC_I_CustomObject (contract v0.3)
+"!   combined with evaluation results from zccmc_cl_rule_engine=>evaluate_object or evaluate_portfolio
+"!   via build_item_from_result and build_items_from_results.
+"! - Deduplicates by normalized (source_system, object_type, object_name) or object_id, keeping only
+"!   the latest run per object so 1:N joins to ZCCMC_USAGE, ZCCMC_FINDING, or ZCCMC_DEPEND never
+"!   double-count objects or strategies.
 CLASS zccmc_cl_portfolio_analytics DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPES:
+      BEGIN OF ty_object_meta,
+        object_id     TYPE string,
+        source_system TYPE string,
+        object_type   TYPE string,
+        object_name   TYPE string,
+        package_name  TYPE string,
+        criticality   TYPE string,
+      END OF ty_object_meta,
+      ty_object_meta_tab TYPE STANDARD TABLE OF ty_object_meta WITH EMPTY KEY.
+
     TYPES:
       BEGIN OF ty_portfolio_item,
         object_id        TYPE string,
@@ -95,6 +101,13 @@ CLASS zccmc_cl_portfolio_analytics DEFINITION
                 is_result        TYPE zccmc_cl_rule_engine=>ty_result
       RETURNING VALUE(rs_item)   TYPE ty_portfolio_item.
 
+    "! Build a portfolio item table from Member 1 imported object metadata rows and a batch of
+    "! rule-engine evaluation results (matched by object_id or object_name).
+    CLASS-METHODS build_items_from_results
+      IMPORTING it_objects      TYPE ty_object_meta_tab
+                it_results      TYPE zccmc_cl_rule_engine=>ty_result_tab
+      RETURNING VALUE(rt_items) TYPE ty_portfolio_item_tab.
+
     "! Compute reconciled portfolio metrics from a list of portfolio items and an optional filter.
     CLASS-METHODS compute_summary
       IMPORTING it_items          TYPE ty_portfolio_item_tab
@@ -109,6 +122,10 @@ CLASS zccmc_cl_portfolio_analytics DEFINITION
     CLASS-METHODS normalize_criticality
       IMPORTING iv_criticality TYPE string
       RETURNING VALUE(rv_crit) TYPE string.
+
+    CLASS-METHODS normalize_strategy
+      IMPORTING iv_strategy     TYPE string
+      RETURNING VALUE(rv_strat) TYPE string.
 
     CLASS-METHODS deduplicate_latest_per_object
       IMPORTING it_items         TYPE ty_portfolio_item_tab
@@ -138,7 +155,7 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
     ENDIF.
     rs_item-package_name     = to_upper( condense( iv_package_name ) ).
     rs_item-criticality      = normalize_criticality( iv_criticality ).
-    rs_item-strategy         = to_upper( condense( is_result-strategy ) ).
+    rs_item-strategy         = normalize_strategy( is_result-strategy ).
     rs_item-ruleset_id       = is_result-ruleset_id.
     rs_item-ruleset_version  = is_result-ruleset_version.
     rs_item-run_id           = is_result-run_id.
@@ -148,10 +165,46 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD build_items_from_results.
+    CLEAR rt_items.
+    LOOP AT it_results INTO DATA(ls_res).
+      DATA(lv_res_key) = to_upper( condense( ls_res-object_id ) ).
+      DATA ls_meta TYPE ty_object_meta.
+      CLEAR ls_meta.
+      LOOP AT it_objects INTO DATA(ls_obj).
+        IF to_upper( condense( ls_obj-object_id ) ) = lv_res_key
+           OR to_upper( condense( ls_obj-object_name ) ) = lv_res_key.
+          ls_meta = ls_obj.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      APPEND build_item_from_result(
+               iv_source_system = ls_meta-source_system
+               iv_object_type   = ls_meta-object_type
+               iv_object_name   = ls_meta-object_name
+               iv_package_name  = ls_meta-package_name
+               iv_criticality   = ls_meta-criticality
+               is_result        = ls_res ) TO rt_items.
+    ENDLOOP.
+  ENDMETHOD.
+
+
   METHOD normalize_criticality.
     rv_crit = to_upper( condense( iv_criticality ) ).
     IF rv_crit <> 'HIGH' AND rv_crit <> 'MEDIUM' AND rv_crit <> 'LOW'.
       rv_crit = 'UNKNOWN'.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD normalize_strategy.
+    rv_strat = to_upper( condense( iv_strategy ) ).
+    IF rv_strat <> zccmc_cl_rule_engine=>c_outcome-keep_adapt
+       AND rv_strat <> zccmc_cl_rule_engine=>c_outcome-rewrite_rap
+       AND rv_strat <> zccmc_cl_rule_engine=>c_outcome-retire_candidate
+       AND rv_strat <> zccmc_cl_rule_engine=>c_outcome-side_by_side_btp
+       AND rv_strat <> zccmc_cl_rule_engine=>c_outcome-manual_review.
+      rv_strat = zccmc_cl_rule_engine=>c_outcome-manual_review.
     ENDIF.
   ENDMETHOD.
 
@@ -194,12 +247,12 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
       ls_norm-source_system = to_upper( condense( ls_raw-source_system ) ).
       ls_norm-object_type   = to_upper( condense( ls_raw-object_type ) ).
       ls_norm-object_name   = to_upper( condense( ls_raw-object_name ) ).
+      IF ls_norm-object_name IS INITIAL.
+        ls_norm-object_name = to_upper( condense( ls_raw-object_id ) ).
+      ENDIF.
       ls_norm-package_name  = to_upper( condense( ls_raw-package_name ) ).
       ls_norm-criticality   = normalize_criticality( ls_raw-criticality ).
-      ls_norm-strategy      = to_upper( condense( ls_raw-strategy ) ).
-      IF ls_norm-strategy IS INITIAL.
-        ls_norm-strategy = zccmc_cl_rule_engine=>c_outcome-manual_review.
-      ENDIF.
+      ls_norm-strategy      = normalize_strategy( ls_raw-strategy ).
 
       " Deduplicate missing_evidence codes within the single item
       CLEAR lt_clean_codes.
@@ -303,12 +356,10 @@ CLASS zccmc_cl_portfolio_analytics IMPLEMENTATION.
 
       rs_summary-total_objects = rs_summary-total_objects + 1.
 
-      " M-02: strategy count
+      " M-02: strategy count (guaranteed to match one of the 5 seeded strategies via normalize_strategy)
       ASSIGN rs_summary-by_strategy[ strategy = ls_item-strategy ] TO FIELD-SYMBOL(<ls_strat>).
       IF sy-subrc = 0.
         <ls_strat>-object_count = <ls_strat>-object_count + 1.
-      ELSE.
-        APPEND VALUE #( strategy = ls_item-strategy object_count = 1 ) TO rs_summary-by_strategy.
       ENDIF.
 
       " M-03: missing-evidence count and per-reason breakdown (1 count per object per reason)
