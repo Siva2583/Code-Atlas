@@ -1,0 +1,47 @@
+[
+  {
+    "AuditID": "AH-ZORD-001",
+    "ObjectID": "Z_ORD_CALC",
+    "ActionDate": "2026-09-18T09:15:00Z",
+    "ChangedBy": "MIGRATION_ANALYST",
+    "OldStrategy": "Assess",
+    "NewStrategy": "Redevelop via RAP",
+    "ChangeReason": "Recommendation generated from the migration assessment."
+  },
+  {
+    "AuditID": "AH-ZORD-002",
+    "ObjectID": "Z_ORD_CALC",
+    "ActionDate": "2026-10-02T14:30:00Z",
+    "ChangedBy": "PORTFOLIO_OWNER",
+    "OldStrategy": "Redevelop via RAP",
+    "NewStrategy": "Redevelop via RAP",
+    "ChangeReason": "Recommendation reviewed; implementation approach confirmed."
+  },
+  {
+    "AuditID": "AH-ZINV-001",
+    "ObjectID": "Z_INV_EXIT",
+    "ActionDate": "2026-09-22T11:05:00Z",
+    "ChangedBy": "MIGRATION_ANALYST",
+    "OldStrategy": "Assess",
+    "NewStrategy": "Replace with BAdI",
+    "ChangeReason": "ATC findings indicate the user exit should be replaced with a released extension."
+  },
+  {
+    "AuditID": "AH-ZINV-002",
+    "ObjectID": "Z_INV_EXIT",
+    "ActionDate": "2026-10-05T16:45:00Z",
+    "ChangedBy": "PORTFOLIO_OWNER",
+    "OldStrategy": "Replace with BAdI",
+    "NewStrategy": "Replace with BAdI",
+    "ChangeReason": "Decision approved after review of the remediation estimate."
+  },
+  {
+    "AuditID": "AH-ZCUST-001",
+    "ObjectID": "Z_CUST_REP",
+    "ActionDate": "2026-09-29T08:20:00Z",
+    "ChangedBy": "MIGRATION_ANALYST",
+    "OldStrategy": "Assess",
+    "NewStrategy": "Retire / Out of Scope",
+    "ChangeReason": "Business owner confirmed the report is no longer used."
+  }
+]
