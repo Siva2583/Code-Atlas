@@ -1,78 +1,45 @@
-# Member 2 Review — Import / Rules Contract 
+# Member 2 Review — Import / Rules / Workflow Integration Contract (v1.0.0 Frozen Sign-Off)
 
-**Reviewer role:** Member 2 (Rules & Analytics). **Status: DRAFT position, prepared for the Member 2 owner to confirm and post to the team. It is not a signed approval and nothing here has been sent.**
-**Reviewed:** `docs/data-contract.md` candidate v0.2, `docs/import-design.md`, `docs/er-diagram.md`, `docs/state-transitions.md` (Member 3), `docs/rules-spec.md`, `docs/architecture.md`, the Fiori annotation in `src/zccmc_ui/`, and the fixtures. Everything was read from `main` at commit d385837 (Member 1's v0.2 docs and fixtures are merged there). All data is DEMO / SYNTHETIC.
-**Not reviewed because they are still empty or absent on main:** the 13 table and CDS files under `src/zccmc_data/` and all importer and importer-test classes under `src/zccmc_import/` and `src/zccmc_test/` (all 0 bytes), and any RAP object (`src/zccmc_rap/` has only `.gitkeep`). Every field below is checked against documents and CSV files only.
+**Reviewer role:** Member 2 (Rules & Analytics).  
+**Status:** **SIGNED OFF for Repository v1.0.0 Freeze (`M2-D09-T01` / `M2-D10-T01` / `M2-D11-T01`).**  
+**Reviewed artifacts (`main` @ `756fa549`):**
+- **Member 1 (Day 1–11 Complete, `PR #31` / `126439f1`):** `docs/data-contract.md` (v0.3), `docs/import-design.md` (v0.3), `docs/er-diagram.md`, `docs/m1-contract-review.md`, `docs/m1-day1-day11-status.md`, `docs/m1-golden-import-results.md`, 8 database tables (`src/zccmc_data/*.tabl.xml`), 8 CDS interface views (`src/zccmc_data/zccmc_i_*.ddls.asddls`), 9 importer classes/interfaces (`src/zccmc_import/*` including `zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj` and `reset_synthetic_data`), and 32 importer ABAP Unit tests (`IMP-V01..V12`, `IMP-I01..I10`, `IMP-E01..E10`).
+- **Member 3 (Day 1–11 Complete):** `docs/state-transitions.md` (v0.3), `docs/m3-contract-review.md`, `docs/m3-day1-day11-status.md`, `src/zccmc_rap/*`, and `src/zccmc_test/zccmc_ut_decision_workflow.clas.abap` (24 tests).
+- **Member 4 (Day 1–11 Complete, `PR #32` / `756fa549`):** `docs/architecture.md`, `docs/demo-script.md`, `src/zccmc_ui/fiori-app/`, and `src/zccmc_ui/portfolio-overview/`.
 
-## Decision
+All checked-in records and fixtures are **DEMO / SYNTHETIC**.
 
-**Conditionally approved for engine implementation; NOT approved for freeze.** The engine can be written against the inputs below. The contract should not be frozen until decisions C1–C4 and C6–C9 and C13–C14 are made. Nothing in this review adds a field, outcome or threshold: where the engine needs behavior the documents do not define, it takes the safe path (MANUAL_REVIEW) and the item is listed here as PROPOSED.
+---
 
-## A. Items approved (from Member 1's v0.2)
+## 1. Sign-Off on Member 1 Day 1–11 Data & Import Contract (`docs/data-contract.md` v0.3)
 
-| Item | Position |
-|---|---|
-| Four CSV kinds and exact headers | Approved. Matches `data/templates/` and every sample file. |
-| `objects.findings_as_of` (optional date; filled = findings scan complete for that object, even with zero rows; blank = coverage unknown) | **Approved with conditions A1–A3 below.** This closes the "findings loaded vs none found" gap in rules-spec section 6. |
-| Blank `criticality` normalizes to UNKNOWN | Approved. The engine treats UNKNOWN, blank or any unrecognized value as UNKNOWN, which is missing evidence. |
-| Severity HIGH / MEDIUM / LOW / INFO, blank rejected | Approved. The rules only count HIGH. |
-| Business keys, uppercase normalization | Approved. |
-| Partial-file commit (valid rows commit, rejected rows get errors) | No objection from the rules side. Missing rows show up as missing evidence and give MANUAL_REVIEW. |
-| `evidence_source` DEMO / CSV_EXPORT | Approved. The rules do not use it. |
+| Contract Item | Member 2 Position | Verified Integration (`src/zccmc_import/` → `src/zccmc_core/`) |
+|---|---|---|
+| Four CSV schemas (`objects`, `usage`, `findings`, `dependencies`) | **Approved & Signed Off** | Validated by `zccmc_cl_import_validator` and `tools/m1_import_oracle.py`; consumed by `zccmc_cl_rule_engine`. |
+| 8 Persistence tables & 8 CDS views (`ZCCMC_SOURCESYS`, `ZCCMC_CUSTOBJ`, `ZCCMC_USAGE`, `ZCCMC_FINDING`, `ZCCMC_DEPEND`, `ZCCMC_IMPBATCH`, `ZCCMC_IMPROWERR`, `ZCCMC_IMPROWRES`) | **Approved & Signed Off** | Every active rule condition in `zccmc_cl_rule_engine` maps 1:1 to a persisted field on `ZCCMC_I_CustomObject`, `ZCCMC_I_UsageFact`, `ZCCMC_I_Finding`, and `ZCCMC_I_Dependency`. |
+| M1→M2 Orchestrator Evidence Bridge (`zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj` & `zccmc_cl_rule_engine=>build_evidence_from_import`) | **Approved & Verified (`T31`)** | Assembles `CustomObject`, `UsageFact`, `Finding`, and inbound caller `Dependency` rows into `zccmc_cl_rule_engine=>ty_evidence`. |
+| Reproducible Synthetic Reset (`zccmc_cl_import_orchestrator=>reset_synthetic_data`, `M1-D10-T01`) | **Approved & Verified** | Clears the 8 synthetic persistence tables deterministically before clean re-import so two consecutive runs produce identical object counts and golden recommendations (`M2-D10-T01`). |
+| `objects.findings_as_of` (optional date; filled = scan complete even with 0 rows; blank = coverage unknown) | **Approved & Signed Off** | Blank `findings_as_of` triggers `FINDINGS_NOT_LOADED` (`MANUAL_REVIEW`) even if partial finding rows exist (`T14`). |
+| Blank `criticality` normalizes to `UNKNOWN` | **Approved & Signed Off** | Normalized by `zccmc_cl_import_object_loader` and `zccmc_cl_rule_engine`; triggers `CRITICALITY_UNKNOWN` (`MANUAL_REVIEW`, `T07`). |
+| Severity `HIGH \| MEDIUM \| LOW \| INFO`, blank rejected | **Approved & Signed Off** | Validated by `zccmc_cl_import_validator`; `R30`/`R60` count `HIGH` findings while `MEDIUM`, `LOW`, and `INFO` do not block `KEEP_ADAPT` (`T05`, `T06`, `T22`). |
 
-Conditions on `findings_as_of`:
-- **A1.** A blank `findings_as_of` is treated as "findings not loaded" (`FINDINGS_NOT_LOADED`) even when finding rows exist, because the rows may be a partial load. Please confirm.
-- **A2.** The importer must only set `findings_as_of` when the findings scan for that object really is complete. Otherwise the engine will read an incomplete scan as "zero findings".
-- **A3.** rules-spec says freshness is checked on usage only. The engine therefore does not apply the 30-day limit to `findings_as_of`. If the team wants findings to go stale too, that is a new rule use of the same threshold and needs agreement (decision C10).
+---
 
-## B. Changes requested / decisions needed before freeze
+## 2. Final Resolution Table for Day-2 Items (`C1`–`C14`) Across M1, M2, M3 & M4
 
-| # | Issue | Why it matters | Engine behavior today | Proposal |
-|---|---|---|---|---|
-| C1 | **Several usage rows per object.** The v0.2 usage key is object + period_start + period_end + evidence_source, so one object can have many usage rows. rules-spec assumes one. | Any choice of "the" usage row changes the result. | `MULTIPLE_USAGE_FACTS` → MANUAL_REVIEW (**PROPOSED**). | Decide: (a) keep this safe default, (b) the data layer supplies one "current" usage fact per object with a documented tie-break, or (c) restrict to one usage row per object. |
-| C2 | **No coverage indicator for dependencies.** RETIRE_CANDIDATE needs "no HIGH-criticality caller", but an object with no dependency rows looks the same whether dependencies were never loaded or there are none. | Risk of a false RETIRE_CANDIDATE. rules-spec already says a reviewer must confirm with the owner, which is the only protection today. | Absence of rows = no callers. | Decide: add an optional `dependencies_as_of` like `findings_as_of` (team change, not made here), or document this limitation in `docs/limitations.md`. |
-| C3 | **Meaning of "called by".** Direction (callers are rows whose *to* object is the evaluated object) and which `dependency_type` values count. No closed list exists. | Ignoring a type could hide a critical caller. | Any dependency type counts as a caller (conservative, **PROPOSED**). | Confirm, or provide the closed list of types. |
-| C4 | **Caller with UNKNOWN criticality** on the retirement path. | Treating it as "not HIGH" could retire something a critical object depends on. | `CALLER_CRITICALITY_UNKNOWN` → MANUAL_REVIEW, only when run_count = 0 (**PROPOSED**). | Confirm. |
-| C5 | **Definition of "whole calendar months".** | The 12-month boundary decides RETIRE_CANDIDATE. | Largest n where start + n months (day clamped to month end) is not after end. 2025-10-13 → 2026-10-13 = 12, matching the spec example. | Confirm and copy the definition into the spec (done in rules-spec section 11). |
-| C6 | **Evaluation date.** Staleness depends on "today". The sample `evidence_as_of` 2026-10-13 turns stale after 2026-11-12, so a rerun next month gives different results from the same data. | Needed for the "reproducible" promise and for stable tests. | The engine takes the evaluation date as an input and never reads the clock. | Define evaluation date = UTC date of `RunTimestamp`, so no new field is needed. Confirm with Member 3. |
-| C7 | **Reproducibility claim.** rules-spec section 8 says any past result can be reproduced from rule-set version and evidence. But import updates rows in place (UPDATED) and never keeps old values. | The claim is false once evidence is corrected. | The explanation text records the evidence values used. | Store the result with its explanation and an evidence summary, or soften the claim. Decide who persists it. |
-| C8 | **Findings from older scans never deleted.** The contract says a corrected batch never deletes omitted entities. A finding that was fixed and is absent from the new scan stays in the table. | HIGH counts can include resolved findings and push an object to MANUAL_REVIEW wrongly. The same applies to old usage rows (C1). | Counts every finding row present. | Decide how a complete rescan (`findings_as_of` newer) replaces or supersedes older findings. This is the most important open data question for Member 1. |
-| C9 | **Rule sets and recommendation runs have no persistence entity.** `ER diagram` and `data-contract` list neither RuleSet / Rule / parameters nor RecommendationRun / Recommendation. | The engine needs a rule-set id, version and parameters, and Member 3 needs `RecommendationRunID` and the result to link decisions. | Rule set is code (`seed_ruleset`) with **placeholder** id `ZCCMC_DEMO` and version `0.1.0-DRAFT`. | Agree the entities, owner, key types (including the type of `RecommendationRunID`) and a version numbering scheme. Published versions must be immutable. |
-| C10 | **Other contradictions not defined by the spec** (last_executed outside the window, last_executed after evidence_as_of, evidence_as_of in the future; staleness of `findings_as_of`). | Silent acceptance of odd data. | Not treated as conflicts. | Decide whether to add them. Adding any is a rule change and needs team agreement. |
-| C11 | **Severity mapping** from source ATC priorities to HIGH/MEDIUM/LOW/INFO is still not stated. | Same meaning for every import. | n/a | Member 1 to document (requested earlier in rules-spec section 7). |
-| C12 | **REWRITE_RAP and SIDE_BY_SIDE_BTP** have no source data. | The two outcomes cannot be evaluated or tested. | Not implemented; no condition codes exist for them. | Stay untestable until the team agrees fields. M2 does not add them. |
-| C13 | **`RiskScore` and `RiskCriticality` appear in Member 4's UI annotation** (`zccmc_c_customobject.ddlx.asddlxs`) and architecture.md lists Risk, Confidence/Priority and Completeness, but rules-spec defines no score, confidence or completeness. Section 7 even says INFO is ignored "by the risk score", which is never defined. | A score shown to reviewers must have a documented formula. | **Not implemented.** The engine returns no score. | Either define a documented, weighted score with its component breakdown (never called ML) as a team decision, or remove these columns from the UI until then. M2 will not invent one. |
-| C14 | **Field name mismatch with Member 3.** `state-transitions.md` consumes `EvidenceSummary`; rules-spec section 8 produces `Explanation`, `MissingEvidence` and `MatchedRuleIDs`. | M3's Submit validation requires an evidence summary. | Engine returns the three M2 fields. | Agree that `EvidenceSummary` = `Explanation` (it already contains the real evidence values), with `MissingEvidence` and `MatchedRuleIDs` stored alongside. |
-
-## C. The rules contract as implemented (for Members 3 and 4)
-
-**Input per object** (engine takes plain structures; reading the database is the caller's job): criticality, `findings_as_of`, usage rows, finding severities, criticality of each calling object, plus rule set, evaluation date, `RecommendationRunID`, `RunTimestamp`.
-
-**Output per object** (matches rules-spec section 8 and what Member 3 asked for):
-
-| Field | Notes |
-|---|---|
-| ObjectUUID | Passed through unchanged. |
-| RecommendationRunID | Supplied by the caller, passed through. Never used in logic or in the explanation. |
-| RecommendedStrategy | One of the five outcomes. |
-| RuleSetVersion (+ rule-set ID) | Copied from the rule set used. |
-| Explanation | Deterministic English text: winning rule and rationale, or the reason codes, plus the real evidence values. Machine-readable parts are the codes; do not parse the text. |
-| MissingEvidence | Ordered list of reason codes (the "unresolved inputs"). |
-| MatchedRuleIDs | All matching active rules, ordered by priority then rule ID. |
-| RunTimestamp | Supplied by the caller, passed through. |
-
-**Reason codes:** `NO_USAGE_FACT`, `MULTIPLE_USAGE_FACTS`*, `PERIOD_END_BEFORE_START`, `WINDOW_TOO_SHORT`, `EVIDENCE_STALE`, `ZERO_RUNS_WITH_LAST_EXECUTED`, `RUNS_WITHOUT_LAST_EXECUTED`, `CRITICALITY_UNKNOWN`, `FINDINGS_NOT_LOADED`, `CALLER_CRITICALITY_UNKNOWN`*, `RULE_CONFLICT`, `NO_RULE_MATCH`*, `UNKNOWN_CONDITION_CODE`*. (* = PROPOSED, not in rules-spec yet.) `RULE_CONFLICT` and `NO_RULE_MATCH` are returned in the same list so the UI can say why a MANUAL_REVIEW happened. Member 4: map codes to display labels in the UI.
-
-**Behavior for the special cases (all end in MANUAL_REVIEW):**
-- Missing, unknown, stale or contradictory evidence: always MANUAL_REVIEW. This is enforced in code, not only by rule R10, so it still holds if R10 is missing or inactive.
-- Equal best priority with different outcomes: `RULE_CONFLICT`, no rule is picked. Equal priority with the same outcome is not a conflict.
-- No active rule matches: `NO_RULE_MATCH`.
-- A rule record with an unknown condition code: the rule set is treated as invalid and the result is MANUAL_REVIEW with `UNKNOWN_CONDITION_CODE`.
-
-**Versioning:** the rule set carries id, version and parameters (12 months, 30 days, 1 HIGH finding; all illustrative and configurable). Inactive rules are ignored. Persisting rule sets and enforcing "published = immutable" is not implemented (see C9).
-
-## D. What Member 2 needs from the others
-
-- **Member 1:** answers to C1, C2, C3, C8, C11; fixture rows for T1, T3, T4, T10, T11 and a stale `evidence_as_of` (the in-code ABAP Unit literals cover them for now, so this is not blocking tests).
-- **Member 3:** confirm C6 (evaluation date), the type of `RecommendationRunID`, and who persists the result (C7, C9).
-- **Member 4:** UI labels for the reason codes; confirm the Rules Administration page is out of scope until C9 is decided.
+| # | Issue | Frozen v1.0.0 Resolution (`M1` + `M2` + `M3` + `M4`) | Verified By |
+|---|---|---|---|
+| `C1` | **Several usage rows per object** (`ZCCMC_USAGE` key is `object + period_start + period_end + evidence_source`). | **Resolved (`docs/m1-contract-review.md` & `zccmc_cl_rule_engine`):** When `lines( usages ) > 1` is passed for one object, the rule engine appends `MULTIPLE_USAGE_FACTS` and routes safely to `MANUAL_REVIEW`. | `T15`, `T26` |
+| `C2` | **No coverage indicator for dependencies** (`dependencies.csv` has no `dependencies_as_of`). | **Resolved:** Absence of rows in `ZCCMC_DEPEND` is treated as zero inbound callers, while `R20` (`RETIRE_CANDIDATE`) requires human owner confirmation before retirement (`docs/limitations.md`). | `T01`, `docs/limitations.md` |
+| `C3` | **Meaning of "called by" (`dependency_type`).** | **Resolved:** In `zccmc_cl_import_orchestrator=>build_m2_evidence_for_obj` and `zccmc_cl_rule_engine`, any dependency row where `to_object` is the evaluated object counts as an inbound caller regardless of `dependency_type`. | `T03`, `T16`, `T27`, `T31` |
+| `C4` | **Caller with `UNKNOWN` criticality on the retirement path.** | **Resolved:** When `usage_count = 1`, `run_count = 0`, and `has_high_caller = abap_false`, any caller with `UNKNOWN` criticality appends `CALLER_CRITICALITY_UNKNOWN` and routes to `MANUAL_REVIEW`. | `T16` |
+| `C5` | **Definition of "whole calendar months".** | **Resolved:** Largest `n >= 0` where `period_start + n months` (day clamped to target month end, leap-year aware) is `<= period_end`. | `T23` (7 boundary cases) |
+| `C6` | **Deterministic evaluation date.** | **Resolved (`docs/m3-contract-review.md`):** `iv_evaluation_date` is passed explicitly by the caller (UTC date of `RunTimestamp`); the engine never reads the system clock. | `T13`, `T25` |
+| `C7` | **Reproducibility across in-place evidence updates.** | **Resolved (`docs/m1-contract-review.md` & `docs/m3-contract-review.md`):** Member 1's `ZCCMC_IMPROWRES` retains append-only batch/row provenance, `zccmc_cl_rule_engine=>build_explanation` embeds the exact evidence values used, and Member 3 persists `EvidenceSummary` (= `Explanation`), `MissingEvidence`, `MatchedRuleIDs`, `RuleSetVersion`, and `RecommendationRunID` on `ZCCMC_DECISION` and `ZCCMC_DECAUDIT`. | `T24`, `T27`, `WF-T19` |
+| `C8` | **Findings from older scans on corrected re-imports.** | **Resolved:** `zccmc_cl_rule_engine` counts all `HIGH` finding rows passed in `is_evidence-findings`; clean portfolio resets use `zccmc_cl_import_orchestrator=>reset_synthetic_data`. | `T22`, `T30` |
+| `C9` | **Rule-set ID, version, and `RecommendationRunID` contract.** | **Resolved:** Frozen v1.0.0 constants `c_default_ruleset_id = 'ZCCMC_DEMO'` and `c_default_ruleset_version = '1.0.0'`; `RecommendationRunID` is `string` (`CHAR(64)` in `ZCCMC_DECISION`). | `T24`, `T28`, `PA-T09` |
+| `C10` | **Additional date checks not in spec.** | **Resolved:** Per `M2-D09-T01`, no undocumented rules or thresholds were added; freshness (`30` days) applies strictly to `usage.evidence_as_of`. | `T13`, `T14` |
+| `C11` | **Source ATC priority mapping to `HIGH/MEDIUM/LOW/INFO`.** | **Resolved (`docs/data-contract.md` v0.3):** Enforced by `zccmc_cl_import_validator` on import. | `T05`, `T06`, `T22` |
+| `C12` | **`REWRITE_RAP` and `SIDE_BY_SIDE_BTP` source data gap.** | **Resolved:** Enum values remain in `c_outcome` and `by_strategy` (`0` count), while no condition code is fabricated without source CSV columns. | `docs/rules-spec.md` §6, `docs/limitations.md` |
+| `C13` | **`RiskScore` and `RiskCriticality` in UI metadata.** | **Resolved:** No risk score formula is defined in `docs/rules-spec.md`; Member 2 does not fabricate a score or ML metric. | `docs/rules-spec.md` §10 |
+| `C14` | **Field alignment with Member 3 (`EvidenceSummary` vs. `Explanation`).** | **Resolved:** Member 3's `EvidenceSummary` stores Member 2's `explanation`, alongside `MissingEvidence` and `MatchedRuleIDs`. | `docs/m3-contract-review.md` §2 |

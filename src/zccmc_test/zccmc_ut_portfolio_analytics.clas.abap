@@ -1,13 +1,17 @@
-"! ABAP Unit tests for ZCCMC_CL_PORTFOLIO_ANALYTICS (Member 2 - Day 6).
+"! ABAP Unit tests for ZCCMC_CL_PORTFOLIO_ANALYTICS (Member 2 — v1.0.0 Frozen, 13 Test Methods).
 "!
-"! Covers docs/rules-spec.md section 12 and M2-D06-T01 acceptance criteria:
+"! Covers docs/rules-spec.md section 10 and M2-D06-T01 through M2-D11-T01 acceptance criteria,
+"! aligned with Member 1's Day 1–11 completed persistence & import contract (v0.3):
 "! - Hand-counted 7 synthetic sample objects (M-01 = 7, M-02 = 6 MANUAL_REVIEW + 1 KEEP_ADAPT,
 "!   M-03 = 4 objects with missing evidence: 2 CRITICALITY_UNKNOWN, 1 NO_USAGE_FACT, 1 WINDOW_TOO_SHORT).
 "! - Filtered subsets (by package, source_system, criticality, strategy, ruleset_version, only_missing).
-"! - Empty portfolio (all counts zero, no crash).
+"! - Groupings by source_system, package, and criticality.
+"! - Empty portfolio (all counts zero, 5 strategies seeded, no crash).
 "! - Anti-double-counting when joined rows or duplicate reason codes are supplied.
 "! - Latest-run selection when multiple runs exist for the same object.
-"! - Row-order determinism.
+"! - Safe fallback to MANUAL_REVIEW for blank or unrecognized strategy codes.
+"! - Fallback to object_id when object_name is blank, and safe skip when identity is completely initial.
+"! - End-to-end batch construction from Member 1 object metadata + evaluate_portfolio results.
 CLASS zccmc_ut_portfolio_analytics DEFINITION
   PUBLIC
   FINAL
@@ -27,7 +31,12 @@ CLASS zccmc_ut_portfolio_analytics DEFINITION
       t05_filter_by_strategy_missing  FOR TESTING,
       t06_no_join_double_counting     FOR TESTING,
       t07_latest_run_wins             FOR TESTING,
-      t08_row_order_determinism       FOR TESTING.
+      t08_row_order_determinism       FOR TESTING,
+      t09_filter_by_ruleset_version   FOR TESTING,
+      t10_groupings_sys_pkg_crit      FOR TESTING,
+      t11_unknown_strategy_fallback   FOR TESTING,
+      t12_missing_identity_and_id_fb  FOR TESTING,
+      t13_batch_build_from_m1_objects FOR TESTING.
 
     METHODS:
       sample_portfolio_items
@@ -57,6 +66,11 @@ CLASS zccmc_ut_portfolio_analytics DEFINITION
       reason_count
         IMPORTING is_summary      TYPE zccmc_cl_portfolio_analytics=>ty_summary
                   iv_reason       TYPE string
+        RETURNING VALUE(rv_count) TYPE i,
+
+      group_count
+        IMPORTING it_groups       TYPE zccmc_cl_portfolio_analytics=>ty_group_count_tab
+                  iv_key          TYPE string
         RETURNING VALUE(rv_count) TYPE i.
 ENDCLASS.
 
@@ -90,10 +104,10 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD sample_portfolio_items.
-    " Mirrors the 7 synthetic sample objects in data/sample-synthetic/*.csv.
+    " Mirrors the 7 synthetic sample objects in data/sample-synthetic/*.csv (contract v0.3).
     DATA ls_e TYPE zccmc_cl_rule_engine=>ty_evidence.
 
-    " 1 ZSD_OPEN_ORDERS_RPT (PROG, ZSD, HIGH)
+    " 1 ZSD_OPEN_ORDERS_RPT (PROG, ZSD_REPORTS, HIGH)
     ls_e = VALUE #( object_id = 'ZSD_OPEN_ORDERS_RPT' criticality = 'HIGH' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260925'
                                                      iv_runs = 2480 iv_as_of = '20261013' ) ) )
@@ -102,7 +116,7 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     APPEND eval_and_build( iv_type = 'PROG' iv_name = 'ZSD_OPEN_ORDERS_RPT' iv_pkg = 'ZSD_REPORTS' is_evidence = ls_e )
       TO rt_items.
 
-    " 2 ZCL_PRICING_HELPER (CLAS, ZCL_SHARED, MEDIUM)
+    " 2 ZCL_PRICING_HELPER (CLAS, ZSD_PRICING, MEDIUM)
     ls_e = VALUE #( object_id = 'ZCL_PRICING_HELPER' criticality = 'MEDIUM' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261012'
                                                      iv_runs = 15210 iv_as_of = '20261013' ) ) )
@@ -111,19 +125,19 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     APPEND eval_and_build( iv_type = 'CLAS' iv_name = 'ZCL_PRICING_HELPER' iv_pkg = 'ZSD_PRICING' is_evidence = ls_e )
       TO rt_items.
 
-    " 3 ZFI_OLD_LEDGER_EXPORT (PROG, ZFI, LOW, no usage row)
+    " 3 ZFI_OLD_LEDGER_EXPORT (PROG, ZFI_LEGACY, LOW, no usage row)
     ls_e = VALUE #( object_id = 'ZFI_OLD_LEDGER_EXPORT' criticality = 'LOW' findings_as_of = '20261013' ).
     APPEND eval_and_build( iv_type = 'PROG' iv_name = 'ZFI_OLD_LEDGER_EXPORT' iv_pkg = 'ZFI_LEGACY' is_evidence = ls_e )
       TO rt_items.
 
-    " 4 ZMM_STOCK_ALERT (PROG, ZMM, MEDIUM, 2-month window)
+    " 4 ZMM_STOCK_ALERT (PROG, ZMM_ALERTS, MEDIUM, 2-month window)
     ls_e = VALUE #( object_id = 'ZMM_STOCK_ALERT' criticality = 'MEDIUM' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20260801' iv_end = '20261013' iv_last = '00000000'
                                                      iv_runs = 0 iv_as_of = '20261013' ) ) ) ).
     APPEND eval_and_build( iv_type = 'PROG' iv_name = 'ZMM_STOCK_ALERT' iv_pkg = 'ZMM_ALERTS' is_evidence = ls_e )
       TO rt_items.
 
-    " 5 ZSD_CUST_CREDIT_CHECK (FUGR, ZSD, HIGH, 1 HIGH finding)
+    " 5 ZSD_CUST_CREDIT_CHECK (FUGR, ZSD_CREDIT, HIGH, 1 HIGH finding)
     ls_e = VALUE #( object_id = 'ZSD_CUST_CREDIT_CHECK' criticality = 'HIGH' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20261010'
                                                      iv_runs = 930 iv_as_of = '20261013' ) ) )
@@ -131,7 +145,7 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     APPEND eval_and_build( iv_type = 'FUGR' iv_name = 'ZSD_CUST_CREDIT_CHECK' iv_pkg = 'ZSD_CREDIT' is_evidence = ls_e )
       TO rt_items.
 
-    " 6 ZCL_INVOICE_UTIL (CLAS, ZCL_SHARED, UNKNOWN criticality)
+    " 6 ZCL_INVOICE_UTIL (CLAS, ZFI_INVOICE, UNKNOWN criticality)
     ls_e = VALUE #( object_id = 'ZCL_INVOICE_UTIL' criticality = 'UNKNOWN' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20260930'
                                                      iv_runs = 41 iv_as_of = '20261013' ) ) )
@@ -139,7 +153,7 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     APPEND eval_and_build( iv_type = 'CLAS' iv_name = 'ZCL_INVOICE_UTIL' iv_pkg = 'ZFI_INVOICE' is_evidence = ls_e )
       TO rt_items.
 
-    " 7 ZHR_PAYROLL_ADJ (PROG, ZHR, UNKNOWN criticality)
+    " 7 ZHR_PAYROLL_ADJ (PROG, ZHR_PAYROLL, UNKNOWN criticality)
     ls_e = VALUE #( object_id = 'ZHR_PAYROLL_ADJ' criticality = 'UNKNOWN' findings_as_of = '20261013'
                     usages   = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013' iv_last = '20251212'
                                                      iv_runs = 3 iv_as_of = '20261013' ) ) ) ).
@@ -158,6 +172,11 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD group_count.
+    rv_count = VALUE #( it_groups[ group_key = iv_key ]-object_count OPTIONAL ).
+  ENDMETHOD.
+
+
   METHOD t01_empty_portfolio.
     DATA lt_empty TYPE zccmc_cl_portfolio_analytics=>ty_portfolio_item_tab.
     DATA(ls_sum) = zccmc_cl_portfolio_analytics=>compute_summary( lt_empty ).
@@ -171,8 +190,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD t02_sample_7_objects_reconcile.
-    " Hand-counted oracle in docs/rules-spec.md section 12:
-    " M-01 = 7; M-02 = MANUAL_REVIEW 6, KEEP_ADAPT 1; M-03 = 4 objects (CRITICALITY_UNKNOWN 2, NO_USAGE_FACT 1, WINDOW_TOO_SHORT 1).
     DATA(ls_sum) = zccmc_cl_portfolio_analytics=>compute_summary( sample_portfolio_items( ) ).
 
     cl_abap_unit_assert=>assert_equals( act = ls_sum-total_objects                  exp = 7 msg = 'M-01 total objects' ).
@@ -197,7 +214,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = reason_count( is_summary = ls_sum iv_reason = 'WINDOW_TOO_SHORT' )
                                         exp = 1 msg = 'M-03 WINDOW_TOO_SHORT' ).
 
-    " Reconcile sum of strategies == total_objects
     DATA(lv_sum_strat) = 0.
     LOOP AT ls_sum-by_strategy INTO DATA(ls_s).
       lv_sum_strat = lv_sum_strat + ls_s-object_count.
@@ -210,7 +226,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
   METHOD t03_filter_by_package.
     DATA(lt_items) = sample_portfolio_items( ).
 
-    " Package ZSD_REPORTS: ZSD_OPEN_ORDERS_RPT -> 1 MANUAL_REVIEW, 0 missing evidence
     DATA(ls_zsd_rpt) = zccmc_cl_portfolio_analytics=>compute_summary(
                          it_items  = lt_items
                          is_filter = VALUE #( package_name = 'ZSD_REPORTS' ) ).
@@ -219,7 +234,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = strategy_count( is_summary = ls_zsd_rpt iv_strategy = 'MANUAL_REVIEW' )
                                         exp = 1 msg = 'ZSD_REPORTS MANUAL_REVIEW' ).
 
-    " Package ZSD_PRICING (case-insensitive): ZCL_PRICING_HELPER -> 1 KEEP_ADAPT, 0 missing evidence
     DATA(ls_pricing) = zccmc_cl_portfolio_analytics=>compute_summary(
                          it_items  = lt_items
                          is_filter = VALUE #( package_name = 'zsd_pricing' ) ).
@@ -228,7 +242,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = strategy_count( is_summary = ls_pricing iv_strategy = 'KEEP_ADAPT' )
                                         exp = 1 msg = 'ZSD_PRICING KEEP_ADAPT' ).
 
-    " Criticality HIGH filter: ZSD_OPEN_ORDERS_RPT and ZSD_CUST_CREDIT_CHECK -> 2 MANUAL_REVIEW
     DATA(ls_high) = zccmc_cl_portfolio_analytics=>compute_summary(
                       it_items  = lt_items
                       is_filter = VALUE #( criticality = 'HIGH' ) ).
@@ -269,8 +282,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD t06_no_join_double_counting.
-    " Simulate a caller passing 6 duplicate rows for the same object (e.g. joined to 6 findings)
-    " and duplicate reason codes within a row. Counts must not inflate.
     DATA(lt_items) = sample_portfolio_items( ).
     DATA(ls_first) = lt_items[ 1 ].
     ls_first-missing_evidence = VALUE #( ( `CRITICALITY_UNKNOWN` ) ( `CRITICALITY_UNKNOWN` ) ).
@@ -289,7 +300,6 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
 
 
   METHOD t07_latest_run_wins.
-    " Two runs for the same object: RUN-0001 had missing evidence, RUN-0002 resolved it to KEEP_ADAPT.
     DATA lt_runs TYPE zccmc_cl_portfolio_analytics=>ty_portfolio_item_tab.
     APPEND VALUE #( object_id        = 'OBJ-1'
                     source_system    = 'DEMO_SYS'
@@ -330,6 +340,122 @@ CLASS zccmc_ut_portfolio_analytics IMPLEMENTATION.
     DATA(ls_b) = zccmc_cl_portfolio_analytics=>compute_summary( lt_reverse ).
     cl_abap_unit_assert=>assert_equals( act = ls_b exp = ls_a
                                         msg = 'portfolio summary must not depend on input row order' ).
+  ENDMETHOD.
+
+
+  METHOD t09_filter_by_ruleset_version.
+    DATA(lt_items) = sample_portfolio_items( ).
+
+    DATA(ls_v1) = zccmc_cl_portfolio_analytics=>compute_summary(
+                    it_items  = lt_items
+                    is_filter = VALUE #( ruleset_version = '1.0.0' ) ).
+    cl_abap_unit_assert=>assert_equals( act = ls_v1-total_objects exp = 7 msg = 'PA-T09 v1.0.0 matches all 7' ).
+
+    DATA(ls_old) = zccmc_cl_portfolio_analytics=>compute_summary(
+                     it_items  = lt_items
+                     is_filter = VALUE #( ruleset_version = '0.1.0-DRAFT' ) ).
+    cl_abap_unit_assert=>assert_equals( act = ls_old-total_objects exp = 0 msg = 'PA-T09 old version matches 0' ).
+  ENDMETHOD.
+
+
+  METHOD t10_groupings_sys_pkg_crit.
+    DATA(ls_sum) = zccmc_cl_portfolio_analytics=>compute_summary( sample_portfolio_items( ) ).
+
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_source_system iv_key = 'DEMO_SYS' )
+                                        exp = 7 msg = 'PA-T10 source_system DEMO_SYS = 7' ).
+    cl_abap_unit_assert=>assert_equals( act = lines( ls_sum-by_package )
+                                        exp = 7 msg = 'PA-T10 7 distinct packages' ).
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_criticality iv_key = 'HIGH' )
+                                        exp = 2 msg = 'PA-T10 criticality HIGH = 2' ).
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_criticality iv_key = 'MEDIUM' )
+                                        exp = 2 msg = 'PA-T10 criticality MEDIUM = 2' ).
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_criticality iv_key = 'LOW' )
+                                        exp = 1 msg = 'PA-T10 criticality LOW = 1' ).
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_criticality iv_key = 'UNKNOWN' )
+                                        exp = 2 msg = 'PA-T10 criticality UNKNOWN = 2' ).
+  ENDMETHOD.
+
+
+  METHOD t11_unknown_strategy_fallback.
+    DATA lt_items TYPE zccmc_cl_portfolio_analytics=>ty_portfolio_item_tab.
+    APPEND VALUE #( object_id     = 'OBJ-BLANK'
+                    source_system = 'DEMO_SYS'
+                    object_type   = 'PROG'
+                    object_name   = 'ZBLANK_STRAT'
+                    strategy      = '' ) TO lt_items.
+    APPEND VALUE #( object_id     = 'OBJ-BOGUS'
+                    source_system = 'DEMO_SYS'
+                    object_type   = 'PROG'
+                    object_name   = 'ZBOGUS_STRAT'
+                    strategy      = 'NOT_A_VALID_OUTCOME' ) TO lt_items.
+
+    DATA(ls_sum) = zccmc_cl_portfolio_analytics=>compute_summary( lt_items ).
+    cl_abap_unit_assert=>assert_equals( act = ls_sum-total_objects        exp = 2 msg = 'PA-T11 2 objects counted' ).
+    cl_abap_unit_assert=>assert_equals( act = lines( ls_sum-by_strategy ) exp = 5 msg = 'PA-T11 strictly 5 strategy buckets' ).
+    cl_abap_unit_assert=>assert_equals( act = strategy_count( is_summary = ls_sum iv_strategy = 'MANUAL_REVIEW' )
+                                        exp = 2 msg = 'PA-T11 both fallback to MANUAL_REVIEW' ).
+  ENDMETHOD.
+
+
+  METHOD t12_missing_identity_and_id_fb.
+    DATA lt_items TYPE zccmc_cl_portfolio_analytics=>ty_portfolio_item_tab.
+    APPEND VALUE #( object_id     = 'OBJ-FALLBACK-ID'
+                    source_system = 'DEMO_SYS'
+                    object_type   = 'CLAS'
+                    object_name   = ''
+                    strategy      = 'KEEP_ADAPT' ) TO lt_items.
+    APPEND VALUE #( object_id     = ''
+                    source_system = ''
+                    object_type   = ''
+                    object_name   = ''
+                    strategy      = 'KEEP_ADAPT' ) TO lt_items.
+
+    DATA(ls_sum) = zccmc_cl_portfolio_analytics=>compute_summary( lt_items ).
+    cl_abap_unit_assert=>assert_equals( act = ls_sum-total_objects exp = 1
+                                        msg = 'PA-T12 blank identity skipped, object_id fallback counted once' ).
+    cl_abap_unit_assert=>assert_equals( act = group_count( it_groups = ls_sum-by_package iv_key = 'UNSPECIFIED' )
+                                        exp = 1 msg = 'PA-T12 blank package grouped as UNSPECIFIED' ).
+  ENDMETHOD.
+
+
+  METHOD t13_batch_build_from_m1_objects.
+    " PA-T13: End-to-end batch construction from Member 1 object metadata + evaluate_portfolio.
+    DATA lt_meta TYPE zccmc_cl_portfolio_analytics=>ty_object_meta_tab.
+    lt_meta = VALUE #(
+      ( object_id = 'ZCL_PRICING_HELPER' source_system = 'DEMO_SYS' object_type = 'CLAS'
+        object_name = 'ZCL_PRICING_HELPER' package_name = 'ZSD_PRICING' criticality = 'MEDIUM' )
+      ( object_id = 'ZFI_OLD_LEDGER_EXPORT' source_system = 'DEMO_SYS' object_type = 'PROG'
+        object_name = 'ZFI_OLD_LEDGER_EXPORT' package_name = 'ZFI_LEGACY' criticality = 'LOW' ) ).
+
+    DATA lt_ev TYPE zccmc_cl_rule_engine=>ty_evidence_tab.
+    APPEND zccmc_cl_rule_engine=>build_evidence_from_import(
+             iv_object_id      = 'ZCL_PRICING_HELPER'
+             iv_criticality    = 'MEDIUM'
+             iv_findings_as_of = '20261013'
+             it_usages         = VALUE #( ( usage_row( iv_start = '20251013' iv_end = '20261013'
+                                                       iv_last  = '20261012' iv_runs = 15210
+                                                       iv_as_of = '20261013' ) ) )
+             it_findings       = VALUE #( ( severity = 'LOW' ) )
+             it_callers        = VALUE #( ( criticality = 'HIGH' ) ) ) TO lt_ev.
+    APPEND zccmc_cl_rule_engine=>build_evidence_from_import(
+             iv_object_id      = 'ZFI_OLD_LEDGER_EXPORT'
+             iv_criticality    = 'LOW'
+             iv_findings_as_of = '20261013' ) TO lt_ev.
+
+    DATA(lt_results) = zccmc_cl_rule_engine=>evaluate_portfolio(
+                         it_evidence        = lt_ev
+                         iv_evaluation_date = c_eval_date
+                         iv_run_id          = c_run_id ).
+    DATA(lt_items)   = zccmc_cl_portfolio_analytics=>build_items_from_results(
+                         it_objects = lt_meta
+                         it_results = lt_results ).
+    DATA(ls_sum)     = zccmc_cl_portfolio_analytics=>compute_summary( lt_items ).
+
+    cl_abap_unit_assert=>assert_equals( act = ls_sum-total_objects exp = 2 msg = 'PA-T13 2 objects built & summarized' ).
+    cl_abap_unit_assert=>assert_equals( act = strategy_count( is_summary = ls_sum iv_strategy = 'KEEP_ADAPT' )
+                                        exp = 1 msg = 'PA-T13 1 KEEP_ADAPT' ).
+    cl_abap_unit_assert=>assert_equals( act = strategy_count( is_summary = ls_sum iv_strategy = 'MANUAL_REVIEW' )
+                                        exp = 1 msg = 'PA-T13 1 MANUAL_REVIEW' ).
   ENDMETHOD.
 
 ENDCLASS.

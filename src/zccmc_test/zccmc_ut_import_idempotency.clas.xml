@@ -5,7 +5,7 @@
    <VSEOCLASS>
     <CLSNAME>ZCCMC_UT_IMPORT_IDEMPOTENCY</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>ABAP Unit Tests for M1 Import Idempotency & Provenance</DESCRIPT>
+    <DESCRIPT>ABAP Unit Tests for M1 Import Idempotency And Provenance</DESCRIPT>
     <CATEGORY>05</CATEGORY>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
