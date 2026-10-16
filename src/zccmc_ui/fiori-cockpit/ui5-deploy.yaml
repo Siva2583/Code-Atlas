@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://sap.github.io/ui5-tooling/schema/ui5.yaml.json
+#
+# Live backend proxy template. Replace the host/client placeholders and update
+# sap.app/dataSources/mainService/uri in webapp/manifest.json to the service root.
+# For BTP, set destination to the configured destination name instead of url.
+
+specVersion: "4.0"
+metadata:
+  name: portfoliooverview
+type: application
+server:
+  customMiddleware:
+    - name: fiori-tools-proxy
+      afterMiddleware: compression
+      configuration:
+        ignoreCertErrors: false
+        ui5:
+          path:
+            - /resources
+            - /test-resources
+          url: https://ui5.sap.com
+        backend:
+          - path: /here
+            url: "https://<SAP_BACKEND_HOST>"
+            client: "<SAP_CLIENT>"
+builder:
+  resources:
+    excludes:
+      - /test/**
+      - /localService/**

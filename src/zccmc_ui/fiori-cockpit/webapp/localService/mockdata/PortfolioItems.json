@@ -67,4 +67,35 @@
     "EvidenceAsOf": "2026-10-13",
     "TotalCount": 1
   }
+  ,
+  {
+    "ObjectUUID": "aa11bb22-33cc-44dd-55ee-66ff77889901",
+    "ObjectName": "Z_ORD_CALC",
+    "ObjectType": "PROG",
+    "PackageName": "Z_FIN_CORE",
+    "RecommendedStrategy": "Redevelop via RAP",
+    "RiskCategory": "High",
+    "DecisionStatus": "Pending Review",
+    "TotalCount": 45
+  },
+  {
+    "ObjectUUID": "aa11bb22-33cc-44dd-55ee-66ff77889902",
+    "ObjectName": "Z_INV_EXIT",
+    "ObjectType": "CLAS",
+    "PackageName": "Z_SD_MODS",
+    "RecommendedStrategy": "Replace with BAdI",
+    "RiskCategory": "Critical",
+    "DecisionStatus": "Approved",
+    "TotalCount": 28
+  },
+  {
+    "ObjectUUID": "aa11bb22-33cc-44dd-55ee-66ff77889903",
+    "ObjectName": "Z_CUST_REP",
+    "ObjectType": "PROG",
+    "PackageName": "Z_SALES",
+    "RecommendedStrategy": "Retire / Out of Scope",
+    "RiskCategory": "Low",
+    "DecisionStatus": "Pending Review",
+    "TotalCount": 15
+  }
 ]

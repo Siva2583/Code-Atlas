@@ -9,7 +9,7 @@ server:
     - name: fiori-tools-proxy
       afterMiddleware: compression
       configuration:
-        ignoreCertErrors: false # If set to true, certificate errors will be ignored. E.g. self-signed certificates will be accepted
+        ignoreCertErrors: false
         ui5:
           path:
             - /resources
@@ -17,7 +17,10 @@ server:
           url: https://ui5.sap.com
         backend:
           - path: /here
-            url: http://localhost
+            # Replace with the SAP HTTPS host before running against a live backend.
+            url: "https://<SAP_BACKEND_HOST>"
+            # For BTP, configure destination instead of url: "<BTP_DESTINATION>".
+            client: "<SAP_CLIENT>"
     - name: fiori-tools-appreload
       afterMiddleware: compression
       configuration:

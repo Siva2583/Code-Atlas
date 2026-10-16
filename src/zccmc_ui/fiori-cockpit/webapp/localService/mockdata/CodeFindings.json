@@ -1,0 +1,47 @@
+[
+  {
+    "FindingID": "CF-ZORD-001",
+    "ObjectID": "Z_ORD_CALC",
+    "CheckRule": "ATC-DB-001",
+    "Severity": "High",
+    "LineNumber": 42,
+    "FindingMessage": "Direct database update bypasses application-level validations.",
+    "RemediationGuidance": "Replace the direct update with a released RAP behavior or application service."
+  },
+  {
+    "FindingID": "CF-ZORD-002",
+    "ObjectID": "Z_ORD_CALC",
+    "CheckRule": "ATC-API-014",
+    "Severity": "Medium",
+    "LineNumber": 87,
+    "FindingMessage": "The program calls a legacy function module that has no released API contract.",
+    "RemediationGuidance": "Use a released API or encapsulate the legacy call behind an approved adapter."
+  },
+  {
+    "FindingID": "CF-ZORD-003",
+    "ObjectID": "Z_ORD_CALC",
+    "CheckRule": "ATC-CLOUD-006",
+    "Severity": "Low",
+    "LineNumber": 116,
+    "FindingMessage": "A classic list output statement is not supported in the target cloud environment.",
+    "RemediationGuidance": "Move output handling to a supported UI or service layer."
+  },
+  {
+    "FindingID": "CF-ZINV-001",
+    "ObjectID": "Z_INV_EXIT",
+    "CheckRule": "ATC-EXT-003",
+    "Severity": "Critical",
+    "LineNumber": 24,
+    "FindingMessage": "The user exit modifies standard invoice processing without an extension contract.",
+    "RemediationGuidance": "Replace the user exit with the released invoice-processing BAdI."
+  },
+  {
+    "FindingID": "CF-ZINV-002",
+    "ObjectID": "Z_INV_EXIT",
+    "CheckRule": "ATC-API-021",
+    "Severity": "Medium",
+    "LineNumber": 63,
+    "FindingMessage": "The implementation reads an internal table using an implicit key.",
+    "RemediationGuidance": "Use an explicit table key and add a focused unit test for lookup behavior."
+  }
+]
